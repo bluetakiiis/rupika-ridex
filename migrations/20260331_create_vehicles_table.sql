@@ -14,7 +14,7 @@ CREATE TABLE vehicles (
 	transmission_type     ENUM('manual','automatic','hybrid') DEFAULT 'manual',
 	fuel_type             ENUM('petrol','diesel','electric') DEFAULT 'petrol',
 	license_plate         VARCHAR(50) NOT NULL UNIQUE,
-	status                ENUM('available','reserved','ready','on_trip','overdue','maintenance') NOT NULL DEFAULT 'available',
+	status                ENUM('available','reserved','on_trip','overdue','maintenance') NOT NULL DEFAULT 'available',
 	gps_id                VARCHAR(50),
 	last_service_date     DATE,
 	description           TEXT,

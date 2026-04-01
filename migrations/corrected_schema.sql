@@ -7,7 +7,6 @@
 DROP TABLE IF EXISTS gps_logs;
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS bookings;
-DROP TABLE IF EXISTS maintenance_records;
 DROP TABLE IF EXISTS vehicles;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS users;
@@ -46,7 +45,7 @@ CREATE TABLE categories (
 --  - price_per_day stored as integer cents
 --  - driver_age_requirement is an integer (18 or 21)
 --  - number_of_seats, transmission_type, fuel_type, license_plate, last_service_date
---  - status now allows reserved, ready, on_trip and overdue in addition to available and maintenance
+--  - status matches UI badges: available, reserved, on_trip, overdue, maintenance
 --  - gps_id for real‑time tracking integration
 CREATE TABLE vehicles (
 	id                    INT AUTO_INCREMENT PRIMARY KEY,
@@ -60,32 +59,13 @@ CREATE TABLE vehicles (
 	transmission_type     ENUM('manual','automatic','hybrid') DEFAULT 'manual',
 	fuel_type             ENUM('petrol','diesel','electric') DEFAULT 'petrol',
 	license_plate         VARCHAR(50) NOT NULL UNIQUE,
-	status                ENUM('available','reserved','ready','on_trip','overdue','maintenance') NOT NULL DEFAULT 'available',
+	status                ENUM('available','reserved','on_trip','overdue','maintenance') NOT NULL DEFAULT 'available',
 	gps_id                VARCHAR(50),
 	last_service_date     DATE,
 	description           TEXT,
 	created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT fk_vehicles_category FOREIGN KEY (category_id) REFERENCES categories(id)
-);
-
--- -------------------------------------------------------------------------
--- Maintenance Records
--- Captures service and repair information for vehicles when marked as
--- maintenance.  Each record is tied to a vehicle and may include details
--- about the issue, workshop and cost.  Separate status to denote completed
--- maintenance.
-CREATE TABLE maintenance_records (
-	id                    INT AUTO_INCREMENT PRIMARY KEY,
-	vehicle_id            INT NOT NULL,
-	issue_description     TEXT NOT NULL,
-	workshop_name         VARCHAR(100) NOT NULL,
-	estimated_completion  DATETIME NOT NULL,
-	service_cost          INT NOT NULL,
-	status                ENUM('ongoing','completed') NOT NULL DEFAULT 'ongoing',
-	created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT fk_maintenance_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
 );
 
 -- -------------------------------------------------------------------------
@@ -105,7 +85,7 @@ CREATE TABLE bookings (
 	pickup_datetime       DATETIME NOT NULL,
 	return_datetime       DATETIME NOT NULL,
 	return_time           DATETIME NULL,
-	status                ENUM('pending','reserved','ready','on_trip','overdue','completed','cancelled') NOT NULL DEFAULT 'pending',
+	status                ENUM('pending','reserved','on_trip','overdue','completed','cancelled') NOT NULL DEFAULT 'pending',
 	payment_status        ENUM('unpaid','pending','paid','cancelled','refunded') NOT NULL DEFAULT 'unpaid',
 	payment_method        ENUM('pay_on_arrival','khalti') NOT NULL,
 	total_amount          INT NOT NULL,
