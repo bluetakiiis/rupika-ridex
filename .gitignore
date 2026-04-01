@@ -1,0 +1,15 @@
+/vendor/
+/node_modules/
+/.env
+/.env.*
+/logs/
+/var/
+/public/uploads/
+/public/js/vendor/
+/public/css/vendor/
+*.log
+*.cache
+/.vscode/
+/.idea/
+*.DS_Store
+Thumbs.db
