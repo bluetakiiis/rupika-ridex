@@ -49,3 +49,20 @@ Rental platform "RIDEX" with public booking flow, user dashboard, admin console,
 
 - Routes and controllers are scaffolded; wire `config/routes.php` to the current flows.
 - Keep status enums (available/reserved/on trip/maintenance/overdue) in sync across UI, constants, and DB.
+
+## Vehicle JSON Sync
+
+- Vehicles now sync bidirectionally between DB and JSON files under `var/cache/vehicles-json/`:
+  - `cars.json`
+  - `bikes.json`
+  - `luxury.json`
+- Public requests trigger sync automatically in `public/index.php` before and after page handling.
+- Manual/cron sync command:
+  - `php bin/sync_vehicles_json.php`
+- Default conflict rule: latest update wins across JSON and DB.
+- JSON edits are detected even when `updated_at` is not manually changed (row hash + file mtime fallback).
+- If a category JSON file is malformed, sync now fails with an explicit error instead of silently reverting file content.
+- Optional conflict-bias modes:
+  - Force JSON winner: `php bin/sync_vehicles_json.php --prefer-json` (or `--force-json`)
+  - `php bin/sync_vehicles_json.php --prefer-db-timestamps`
+  - `php bin/sync_vehicles_json.php --prefer-db` (alias)

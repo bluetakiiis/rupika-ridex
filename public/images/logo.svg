@@ -1,5 +1,19 @@
-<!--
-Purpose: Placeholder for brand logo SVG.
-Website Section: Global Branding (nav, footer, emails, PDFs).
-Developer Notes: Replace with final vector logo; ensure viewBox is set for responsive scaling.
--->
+<svg width="220" height="64" viewBox="0 0 220 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ridexLogoTitle ridexLogoDesc">
+	<title id="ridexLogoTitle">Ridex</title>
+	<desc id="ridexLogoDesc">Ridex wordmark with interlocking loop icon and tagline Drive Your Way.</desc>
+	<defs>
+		<linearGradient id="ridexStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#ffffff" stop-opacity="0.96" />
+			<stop offset="100%" stop-color="#e9e9e9" stop-opacity="0.9" />
+		</linearGradient>
+	</defs>
+	<g fill="none" stroke="url(#ridexStroke)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+		<path d="M18 32c0-8.837 7.163-16 16-16h10c8.837 0 16 7.163 16 16s-7.163 16-16 16h-8c-6.627 0-12 5.373-12 12" />
+		<path d="M28 14c0 6.627 5.373 12 12 12h6c6.627 0 12 5.373 12 12" />
+		<path d="M22 44c0 6.627 5.373 12 12 12h12" />
+	</g>
+	<g fill="#ffffff" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="700">
+		<text x="90" y="30" font-size="26" letter-spacing="0.02em">RIDEX</text>
+		<text x="90" y="50" font-size="14" font-weight="600">Drive Your Way</text>
+	</g>
+</svg>
