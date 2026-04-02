@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS vehicles;
 CREATE TABLE vehicles (
 	id                    INT AUTO_INCREMENT PRIMARY KEY,
 	category_id           INT NOT NULL,
+	vehicle_type          ENUM('cars','bikes','luxury') NOT NULL DEFAULT 'cars',
 	short_name            VARCHAR(100) NOT NULL,
 	full_name             VARCHAR(150) NOT NULL,
 	price_per_day         INT NOT NULL,
