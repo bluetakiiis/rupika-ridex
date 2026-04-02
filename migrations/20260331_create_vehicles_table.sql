@@ -12,7 +12,7 @@ CREATE TABLE vehicles (
 	driver_age_requirement INT NOT NULL,
 	image_path            VARCHAR(255),
 	number_of_seats       INT,
-	transmission_type     ENUM('manual','automatic','hybrid') DEFAULT 'manual',
+	transmission_type     ENUM('manual','automatic','hybrid','N/A') DEFAULT 'manual',
 	fuel_type             ENUM('petrol','diesel','electric') DEFAULT 'petrol',
 	license_plate         VARCHAR(50) NOT NULL UNIQUE,
 	status                ENUM('available','reserved','on_trip','overdue','maintenance') NOT NULL DEFAULT 'available',

@@ -29,7 +29,7 @@ CREATE TABLE users (
 	street          VARCHAR(255),
 	post_code       VARCHAR(20),
 	city            VARCHAR(100),
-	district        ENUM('Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'),
+	province        ENUM('Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'),
 	role            ENUM('user','admin') NOT NULL DEFAULT 'user',
 	drivers_id      VARCHAR(50),  -- e.g. driver licence number; optional for admin
 	created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -64,7 +64,7 @@ CREATE TABLE vehicles (
 	driver_age_requirement INT NOT NULL,
 	image_path            VARCHAR(255),
 	number_of_seats       INT,
-	transmission_type     ENUM('manual','automatic','hybrid') DEFAULT 'manual',
+	transmission_type     ENUM('manual','automatic','hybrid','N/A') DEFAULT 'manual',
 	fuel_type             ENUM('petrol','diesel','electric') DEFAULT 'petrol',
 	license_plate         VARCHAR(50) NOT NULL UNIQUE,
 	status                ENUM('available','reserved','on_trip','overdue','maintenance') NOT NULL DEFAULT 'available',

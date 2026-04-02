@@ -15,7 +15,7 @@ CREATE TABLE users (
 	street          VARCHAR(255),
 	post_code       VARCHAR(20),
 	city            VARCHAR(100),
-	district        ENUM('Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'),
+	province        ENUM('Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'),
 	role            ENUM('user','admin') NOT NULL DEFAULT 'user',
 	drivers_id      VARCHAR(50),
 	created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
