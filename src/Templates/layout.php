@@ -46,6 +46,8 @@ $viewData = $viewData ?? [];
 		?>
 	</main>
 
+	<?php include __DIR__ . '/../Views/partials/modals.php'; ?>
+
 	<?php include __DIR__ . '/../Views/partials/footer.php'; ?>
 </body>
 </html>

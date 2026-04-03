@@ -75,4 +75,5 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr" defer></script>
+<script src="js/app.js?v=20260403-2" defer></script>
 <script src="js/booking.js?v=20260402-5" defer></script>

@@ -18,7 +18,8 @@
 			<button class="icon-button" type="button" aria-label="User profile">
 				<span class="material-symbols-rounded" aria-hidden="true">account_circle</span>
 			</button>
-			<button class="icon-button" type="button" aria-label="Open menu">
+			<?php //menu: opens global navigation modal ?>
+			<button class="icon-button" type="button" aria-label="Open menu" data-menu-open>
 				<span class="material-symbols-rounded" aria-hidden="true">menu</span>
 			</button>
 		</nav>
