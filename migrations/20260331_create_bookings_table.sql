@@ -1,8 +1,7 @@
 -- Purpose: Store reservation/rental records with booking lifecycle and payment status.
 -- Website Section: Booking & Payment Flow (user checkout, admin booking oversight).
 -- Developer Notes: Links to user, vehicle; includes pickup/return data, booking_number, drivers_id, payment tracking fields.
-DROP TABLE IF EXISTS bookings;
-CREATE TABLE bookings (
+CREATE TABLE IF NOT EXISTS bookings (
 	id                    INT AUTO_INCREMENT PRIMARY KEY,
 	booking_number        VARCHAR(15) NOT NULL UNIQUE,
 	user_id               INT NOT NULL,

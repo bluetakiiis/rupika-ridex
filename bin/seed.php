@@ -17,21 +17,178 @@ try {
 		['Luxury', 'Premium and high-end vehicles'],
 	];
 
-	$categoryStmt = $pdo->prepare('SELECT id FROM categories WHERE name = :name LIMIT 1');
+	$categoryStmt = $pdo->prepare('SELECT id FROM categories WHERE LOWER(name) = LOWER(:name) LIMIT 1');
 	$categoryInsertStmt = $pdo->prepare('INSERT INTO categories (name, description) VALUES (:name, :description)');
+	$categoryIdsByType = [];
 
 	foreach ($categories as [$name, $description]) {
 		$categoryStmt->execute(['name' => $name]);
-		if (!$categoryStmt->fetchColumn()) {
+		$categoryId = (int) $categoryStmt->fetchColumn();
+		if ($categoryId <= 0) {
 			$categoryInsertStmt->execute([
 				'name' => $name,
 				'description' => $description,
 			]);
+			$categoryId = (int) $pdo->lastInsertId();
 		}
+
+		$categoryKey = strtolower($name);
+		$categoryIdsByType[$categoryKey] = $categoryId;
+	}
+
+	$vehicles = [
+		[
+			'category_key' => 'cars',
+			'vehicle_type' => 'cars',
+			'short_name' => 'Victoris',
+			'full_name' => 'Maruti Suzuki Victoris',
+			'price_per_day' => 52,
+			'driver_age_requirement' => 21,
+			'image_path' => 'images/car1.png',
+			'number_of_seats' => 5,
+			'transmission_type' => 'automatic',
+			'fuel_type' => 'electric',
+			'license_plate' => 'BAA-1234',
+			'status' => 'available',
+			'gps_id' => 'GPS-001',
+			'last_service_date' => null,
+			'description' => 'Maruti Suzuki Victoris combines comfort, safety, and modern technology for city and highway travel.',
+		],
+		[
+			'category_key' => 'cars',
+			'vehicle_type' => 'cars',
+			'short_name' => 'Honda Elevate',
+			'full_name' => 'Honda Elevate',
+			'price_per_day' => 47,
+			'driver_age_requirement' => 21,
+			'image_path' => 'images/honda-elevate-1.png',
+			'number_of_seats' => 5,
+			'transmission_type' => 'automatic',
+			'fuel_type' => 'petrol',
+			'license_plate' => 'BAA-1235',
+			'status' => 'available',
+			'gps_id' => null,
+			'last_service_date' => null,
+			'description' => 'Honda Elevate is a versatile SUV designed for mixed road conditions with strong comfort and safety features.',
+		],
+		[
+			'category_key' => 'bikes',
+			'vehicle_type' => 'bikes',
+			'short_name' => 'Vespa',
+			'full_name' => 'Vespa ZX 125',
+			'price_per_day' => 30,
+			'driver_age_requirement' => 18,
+			'image_path' => 'images/bikes.png',
+			'number_of_seats' => 2,
+			'transmission_type' => 'N/A',
+			'fuel_type' => 'petrol',
+			'license_plate' => 'BAA-1723',
+			'status' => 'available',
+			'gps_id' => null,
+			'last_service_date' => null,
+			'description' => 'Vespa ZX 125 offers practical commuting performance with classic scooter styling.',
+		],
+		[
+			'category_key' => 'luxury',
+			'vehicle_type' => 'luxury',
+			'short_name' => 'SL-Class (R231)',
+			'full_name' => 'Mercedes-Benz SL-Class (R231)',
+			'price_per_day' => 100,
+			'driver_age_requirement' => 21,
+			'image_path' => 'images/luxury.png',
+			'number_of_seats' => 2,
+			'transmission_type' => 'hybrid',
+			'fuel_type' => 'petrol',
+			'license_plate' => 'BAA-1903',
+			'status' => 'available',
+			'gps_id' => null,
+			'last_service_date' => null,
+			'description' => 'Mercedes-Benz SL-Class delivers premium grand touring comfort with high-performance engineering.',
+		],
+	];
+
+	$vehicleUpsertStmt = $pdo->prepare(
+		'INSERT INTO vehicles (
+			category_id,
+			vehicle_type,
+			short_name,
+			full_name,
+			price_per_day,
+			driver_age_requirement,
+			image_path,
+			number_of_seats,
+			transmission_type,
+			fuel_type,
+			license_plate,
+			status,
+			gps_id,
+			last_service_date,
+			description
+		) VALUES (
+			:category_id,
+			:vehicle_type,
+			:short_name,
+			:full_name,
+			:price_per_day,
+			:driver_age_requirement,
+			:image_path,
+			:number_of_seats,
+			:transmission_type,
+			:fuel_type,
+			:license_plate,
+			:status,
+			:gps_id,
+			:last_service_date,
+			:description
+		)
+		ON DUPLICATE KEY UPDATE
+			category_id = VALUES(category_id),
+			vehicle_type = VALUES(vehicle_type),
+			short_name = VALUES(short_name),
+			full_name = VALUES(full_name),
+			price_per_day = VALUES(price_per_day),
+			driver_age_requirement = VALUES(driver_age_requirement),
+			image_path = VALUES(image_path),
+			number_of_seats = VALUES(number_of_seats),
+			transmission_type = VALUES(transmission_type),
+			fuel_type = VALUES(fuel_type),
+			status = VALUES(status),
+			gps_id = VALUES(gps_id),
+			last_service_date = VALUES(last_service_date),
+			description = VALUES(description),
+			updated_at = CURRENT_TIMESTAMP'
+	);
+
+	$upsertedVehicleCount = 0;
+	foreach ($vehicles as $vehicle) {
+		$categoryKey = strtolower((string) ($vehicle['category_key'] ?? ''));
+		$categoryId = (int) ($categoryIdsByType[$categoryKey] ?? 0);
+		if ($categoryId <= 0) {
+			throw new RuntimeException('Missing category for vehicle seed key: ' . $categoryKey);
+		}
+
+		$vehicleUpsertStmt->execute([
+			'category_id' => $categoryId,
+			'vehicle_type' => $vehicle['vehicle_type'],
+			'short_name' => $vehicle['short_name'],
+			'full_name' => $vehicle['full_name'],
+			'price_per_day' => $vehicle['price_per_day'],
+			'driver_age_requirement' => $vehicle['driver_age_requirement'],
+			'image_path' => $vehicle['image_path'],
+			'number_of_seats' => $vehicle['number_of_seats'],
+			'transmission_type' => $vehicle['transmission_type'],
+			'fuel_type' => $vehicle['fuel_type'],
+			'license_plate' => $vehicle['license_plate'],
+			'status' => $vehicle['status'],
+			'gps_id' => $vehicle['gps_id'],
+			'last_service_date' => $vehicle['last_service_date'],
+			'description' => $vehicle['description'],
+		]);
+		$upsertedVehicleCount++;
 	}
 
 	$pdo->commit();
-	echo "Seed completed" . PHP_EOL;
+	echo 'Seed completed. Vehicle rows processed: ' . $upsertedVehicleCount . PHP_EOL;
 } catch (Throwable $exception) {
 	$pdo->rollBack();
 	fwrite(STDERR, 'Seed failed: ' . $exception->getMessage() . PHP_EOL);

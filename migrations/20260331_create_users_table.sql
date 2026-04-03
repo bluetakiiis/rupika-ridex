@@ -1,8 +1,7 @@
 -- Purpose: Define the users table for authentication and account roles (customers and admins).
 -- Website Section: Authentication & Account Management (user login/registration, admin access).
 -- Developer Notes: Run this migration first; enforces unique email and stores profile/contact plus drivers_id for booking flow.
-DROP TABLE IF EXISTS users;
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
 	id              INT AUTO_INCREMENT PRIMARY KEY,
 	name            VARCHAR(100) NOT NULL,
 	first_name      VARCHAR(100),
