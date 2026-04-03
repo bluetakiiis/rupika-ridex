@@ -1,9 +1,7 @@
 <?php
 /**
  * Purpose: Bidirectional sync between vehicles table and per-category JSON files.
- * Website Section: Data Sync / Catalog.
- * Developer Notes: Keeps three JSON files (cars, bikes, luxury) aligned with DB rows using updated_at conflict checks.
- */
+*/
 
 if (!function_exists('sync_vehicles_json_bidirectional')) {
 	function sync_vehicles_json_bidirectional(PDO $pdo, string $jsonDirectory, array $options = []): array

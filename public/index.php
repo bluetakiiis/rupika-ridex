@@ -1,9 +1,7 @@
 <?php
 /**
  * Purpose: Front controller for web requests; loads config, routes, and dispatches controllers.
- * Website Section: Global Entry Point (public web).
- * Developer Notes: Bootstrap environment, register error handling, route incoming requests to controllers/views.
- */
+*/
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/Helpers/vehicle_json_sync.php';
@@ -33,6 +31,29 @@ $sanitizeVehicleType = static function ($rawType) use ($allowedVehicleTypes): st
 };
 
 $page = strtolower(trim((string) ($_GET['page'] ?? 'home')));
+
+$bookingSearchKeys = [
+	'pickup-location',
+	'return-location',
+	'pickup-date',
+	'return-date',
+	'pickup-time',
+	'return-time',
+	'same-return',
+];
+
+$isBookingSearchAttempt = false;
+foreach ($bookingSearchKeys as $bookingSearchKey) {
+	if (array_key_exists($bookingSearchKey, $_GET)) {
+		$isBookingSearchAttempt = true;
+		break;
+	}
+}
+
+if ($page === 'vehicles' && $isBookingSearchAttempt) {
+	header('Location: index.php#home-vehicle-category', true, 302);
+	exit;
+}
 
 if ($page === 'vehicles') {
 	$selectedVehicleType = $sanitizeVehicleType($_GET['vehicle_type'] ?? 'cars');

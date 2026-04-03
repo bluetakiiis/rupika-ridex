@@ -1,9 +1,7 @@
 <?php
 /**
  * Purpose: CLI script to sync vehicles table bidirectionally with category JSON files.
- * Website Section: DevOps / Data Sync.
- * Developer Notes: Run manually or via cron to keep DB and JSON in sync for cars, bikes, and luxury categories.
- */
+*/
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/Helpers/vehicle_json_sync.php';

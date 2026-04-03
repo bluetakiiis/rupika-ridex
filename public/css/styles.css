@@ -1,7 +1,15 @@
 /*
  * Purpose: Global site styles for customer-facing pages.
- * Website Section: Marketing, Catalog, Booking, Dashboard.
- * Developer Notes: Define base typography, layout grid, component styles (cards/forms/modals), and responsive breakpoints.
+ * Sections (top-to-bottom render order):
+ * 1) Base
+ * 2) Header
+ * 3) Hero
+ * 4) Booking Engine
+ * 5) Catalog & Cards
+ * 6) Vehicle Detail
+ * 7) Policy Pages
+ * 8) Footer
+ * 9) Responsive Overrides
  */
 
 :root {
@@ -43,7 +51,7 @@ body {
   padding: 0 38px; /* ~1cm global side padding */
 }
 
-/* Global header */
+/* 2) Header */
 .site-header {
   position: sticky;
   top: 0;
@@ -100,12 +108,6 @@ body {
   transform: translateY(-1px);
 }
 
-.icon-button__img {
-  width: 28px;
-  height: 28px;
-  display: block;
-}
-
 .material-symbols-rounded {
   font-variation-settings:
     "FILL" 0,
@@ -117,7 +119,7 @@ body {
   line-height: 1;
 }
 
-/* Hero banner */
+/* 3) Hero */
 .hero-banner {
   position: relative;
   margin: 32px auto;
@@ -202,7 +204,7 @@ body {
   border-color: var(--color-main-secondary);
 }
 
-/* Booking engine */
+/* 4) Booking Engine */
 .booking-engine {
   margin: calc(-1 * clamp(96px, 10vw, 128px)) auto 48px;
   position: relative;
@@ -243,12 +245,6 @@ body {
 
   100% {
     transform: scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .booking-engine--pop {
-    animation: none;
   }
 }
 
@@ -683,7 +679,7 @@ span.flatpickr-weekday {
   background: var(--color-main-secondary);
 }
 
-/* Categories and vehicle cards */
+/* 5) Catalog & Cards */
 .category-section {
   margin: 64px 0 80px;
   display: flex;
@@ -728,13 +724,6 @@ span.flatpickr-weekday {
 .category-tab:not(.is-active):focus-visible {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
   border-color: var(--color-main);
-}
-
-.vehicle-results-summary {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 500;
-  color: #2f2f2f;
 }
 
 .vehicle-results-empty {
@@ -952,7 +941,7 @@ span.flatpickr-weekday {
   display: inline-block;
 }
 
-/* Vehicle detail page */
+/* 6) Vehicle Detail */
 .vehicle-detail-page {
   margin: 10px 0 80px;
   display: flex;
@@ -1080,52 +1069,7 @@ span.flatpickr-weekday {
   max-width: 900px;
 }
 
-@media (max-width: 1024px) {
-  .vehicle-detail-header-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .vehicle-detail-cta {
-    align-self: flex-start;
-  }
-
-  .vehicle-detail-content-row {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-
-  .vehicle-detail-benefits {
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, max-content);
-    overflow-x: auto;
-    padding-bottom: 4px;
-  }
-}
-
-@media (max-width: 640px) {
-  .vehicle-detail-title {
-    font-size: 26px;
-  }
-
-  .vehicle-detail-meta {
-    gap: 10px;
-  }
-
-  .vehicle-detail-cta {
-    flex-wrap: wrap;
-  }
-
-  .vehicle-detail-image {
-    max-height: 220px;
-  }
-
-  .vehicle-detail-description {
-    font-size: 15px;
-  }
-}
-
-/* Policy pages */
+/* 7) Policy Pages */
 .policy-page {
   margin: 14px 0 80px;
 }
@@ -1184,42 +1128,7 @@ span.flatpickr-weekday {
   color: #8f8f8f;
 }
 
-@media (max-width: 1024px) {
-  .policy-title {
-    margin-bottom: 24px;
-    font-size: 42px;
-  }
-
-  .policy-heading {
-    font-size: 28px;
-  }
-
-  .policy-paragraph,
-  .policy-list li {
-    font-size: 17px;
-  }
-}
-
-@media (max-width: 640px) {
-  .policy-page {
-    margin-top: 8px;
-  }
-
-  .policy-title {
-    font-size: 34px;
-  }
-
-  .policy-heading {
-    font-size: 23px;
-  }
-
-  .policy-paragraph,
-  .policy-list li {
-    font-size: 15px;
-  }
-}
-
-/* Global footer */
+/* 8) Footer */
 .site-footer {
   position: relative;
   margin: 0;
@@ -1275,12 +1184,6 @@ span.flatpickr-weekday {
   height: auto;
   display: block;
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.22));
-}
-
-.site-footer__tagline {
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: 0.02em;
 }
 
 .site-footer__contact {

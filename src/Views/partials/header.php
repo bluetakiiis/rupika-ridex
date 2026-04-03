@@ -1,9 +1,7 @@
 <?php
 /**
  * Purpose: Shared HTML <head> and top navigation bar for public pages.
- * Website Section: Global Layout.
- * Developer Notes: Renders brand logo and compact user/menu actions. Keep links and assets responsive.
- */
+*/
 ?>
 
 <header class="site-header" role="banner">

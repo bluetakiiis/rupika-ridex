@@ -1,9 +1,7 @@
 <?php
 /**
  * Purpose: Landing page view showing hero search, featured vehicles, and marketing sections.
- * Website Section: Marketing & Discovery.
- * Developer Notes: Render search partial, featured vehicle cards, promotions, and route to catalog filters.
- */
+*/
 
 $featuredVehicles = $featuredVehicles ?? [];
 $selectedHomeVehicleType = $selectedHomeVehicleType ?? 'cars';
@@ -104,7 +102,7 @@ $selectedHomeVehicleTypeLabel = strtolower($homeVehicleTypeLabels[$selectedHomeV
 			</div>
 
 			<div class="booking-actions">
-				<button class="booking-search" type="submit">Search</button>
+				<button class="booking-search" type="button">Search</button>
 			</div>
 		</div>
 	</form>
