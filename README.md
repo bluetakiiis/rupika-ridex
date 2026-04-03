@@ -26,6 +26,30 @@ Rental platform "RIDEX" with public booking flow, user dashboard, admin console,
 4. Seed sample data: `php bin/seed.php` (optional)
 5. Serve (dev): `php -S localhost:8000 -t public`
 
+## Render Free Deployment (Single Service)
+
+If you cannot pay for a separate Render DB service, deploy only the web service with Docker and run MariaDB inside the same container.
+
+- This repo now supports embedded DB mode by default using `docker/entrypoint.sh`.
+- Keep `USE_EMBEDDED_DB=1` (default).
+- Set these web-service env vars on Render:
+  - `DB_NAME=ridex_db`
+  - `DB_USER=ridex_app`
+  - `DB_PASS=<your_password>`
+  - `APP_ENV=production`
+  - `APP_DEBUG=false`
+  - `BASE_URL=/`
+- On container boot, it will:
+  - start MariaDB locally,
+  - run `php bin/migrate.php`,
+  - run `php bin/seed.php`,
+  - start Apache.
+
+Notes:
+- This is suitable for demos/school projects.
+- Container storage is ephemeral on free tier, so DB data can reset when the instance is replaced.
+- For persistent production data, use a managed DB with persistent storage.
+
 ## Project Layout (high level)
 
 - `public/` entrypoint and assets (css/js/uploads)

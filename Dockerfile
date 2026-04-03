@@ -1,27 +1,36 @@
 # Use the official PHP 8.2 image with Apache
 FROM php:8.2-apache
 
-# 1. Install necessary system dependencies and PHP extensions for MySQL
-# This matches the MariaDB/MySQL requirements in your vehicles.sql file
-RUN apt-get update && apt-get install -y \
+# Install DB clients/server and PHP MySQL extensions.
+# MariaDB server is used only when USE_EMBEDDED_DB=1 (free single-service mode).
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libmariadb-dev \
-    && docker-php-ext-install pdo pdo_mysql
+    mariadb-server \
+    mariadb-client \
+    && docker-php-ext-install pdo pdo_mysql \
+    && rm -rf /var/lib/apt/lists/*
 
-# 2. Enable Apache mod_rewrite
-# Critical for the routing logic in your public/.htaccess and index.php
+# Enable Apache mod_rewrite for pretty routes.
 RUN a2enmod rewrite
 
-# 3. Reconfigure Apache to use /public as the Document Root
-# This fixes the "Cannot serve directory /var/www/html/" error from your logs
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+# Reconfigure Apache to use /public as the Document Root.
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
+    && sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
-# 4. Copy your project files into the container
+# Defaults for free demo mode.
+ENV USE_EMBEDDED_DB=1
+ENV DB_HOST=127.0.0.1
+ENV DB_PORT=3306
+ENV DB_NAME=ridex_db
+ENV DB_USER=ridex_app
+ENV DB_PASS=ridex_app_pass
+
+# Copy project and startup script.
 COPY . /var/www/html/
+COPY docker/entrypoint.sh /usr/local/bin/ridex-entrypoint
+RUN chmod +x /usr/local/bin/ridex-entrypoint \
+    && chown -R www-data:www-data /var/www/html
 
-# 5. Set proper ownership for the web server
-RUN chown -R www-data:www-data /var/www/html
-
-# Expose the default Apache port
 EXPOSE 80
+CMD ["ridex-entrypoint"]
