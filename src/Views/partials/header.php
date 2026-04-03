@@ -2,6 +2,13 @@
 /**
  * Purpose: Shared HTML <head> and top navigation bar for public pages.
 */
+
+$headerSessionUser = isset($_SESSION['auth_user']) && is_array($_SESSION['auth_user'])
+	? $_SESSION['auth_user']
+	: [];
+$headerIsAdmin = (($headerSessionUser['role'] ?? '') === 'admin');
+$headerCurrentPage = strtolower(trim((string) ($page ?? '')));
+$headerIsAdminPage = str_starts_with($headerCurrentPage, 'admin');
 ?>
 
 <header class="site-header" role="banner">
@@ -15,13 +22,20 @@
 			/>
 		</div>
 		<nav class="site-header__actions" aria-label="User navigation">
-			<button class="icon-button" type="button" aria-label="User profile">
+			<button
+				class="icon-button icon-button--profile"
+				type="button"
+				aria-label="User profile"
+				<?= $headerIsAdmin ? 'data-modal-target="admin-profile-modal"' : '' ?>
+			>
 				<span class="material-symbols-rounded" aria-hidden="true">account_circle</span>
 			</button>
-			<?php //menu: opens global navigation modal ?>
-			<button class="icon-button" type="button" aria-label="Open menu" data-menu-open>
-				<span class="material-symbols-rounded" aria-hidden="true">menu</span>
-			</button>
+			<?php if (!$headerIsAdminPage): ?>
+				<?php //menu: opens global navigation modal ?>
+				<button class="icon-button" type="button" aria-label="Open menu" data-menu-open>
+					<span class="material-symbols-rounded" aria-hidden="true">menu</span>
+				</button>
+			<?php endif; ?>
 		</nav>
 	</div>
 </header>

@@ -34,6 +34,43 @@ try {
 		$categoryIdsByType[$categoryKey] = $categoryId;
 	}
 
+	// admin login: ensure the requested default admin credential exists as a hashed password record
+	$defaultAdminEmail = 'rupikadangole@gmail.com';
+	$defaultAdminPassword = '12345678';
+	$defaultAdminHash = password_hash($defaultAdminPassword, PASSWORD_DEFAULT);
+
+	$existingAdminStmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+	$existingAdminStmt->execute(['email' => $defaultAdminEmail]);
+	$existingAdminId = (int) $existingAdminStmt->fetchColumn();
+
+	if ($existingAdminId > 0) {
+		$updateAdminStmt = $pdo->prepare(
+			'UPDATE users
+			 SET role = :role,
+				 name = :name,
+				 password_hash = :password_hash,
+				 updated_at = CURRENT_TIMESTAMP
+			 WHERE id = :id'
+		);
+		$updateAdminStmt->execute([
+			'role' => 'admin',
+			'name' => 'Ridex Admin',
+			'password_hash' => $defaultAdminHash,
+			'id' => $existingAdminId,
+		]);
+	} else {
+		$insertAdminStmt = $pdo->prepare(
+			'INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
+			 VALUES (:name, :email, :password_hash, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
+		);
+		$insertAdminStmt->execute([
+			'name' => 'Ridex Admin',
+			'email' => $defaultAdminEmail,
+			'password_hash' => $defaultAdminHash,
+			'role' => 'admin',
+		]);
+	}
+
 	$vehicles = [
 		[
 			'category_key' => 'cars',

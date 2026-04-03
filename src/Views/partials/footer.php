@@ -2,6 +2,9 @@
 /**
  * Purpose: Shared footer partial closing layout and loading JS assets.
 */
+
+$footerCurrentPage = strtolower(trim((string) ($page ?? '')));
+$footerIsAdminPage = str_starts_with($footerCurrentPage, 'admin');
 ?>
 
 <footer class="site-footer" role="contentinfo">
@@ -77,3 +80,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr" defer></script>
 <script src="js/app.js?v=20260403-2" defer></script>
 <script src="js/booking.js?v=20260402-5" defer></script>
+<?php if ($footerIsAdminPage): ?>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+	<script src="js/admin-dashboard.js?v=20260404-1" defer></script>
+<?php endif; ?>

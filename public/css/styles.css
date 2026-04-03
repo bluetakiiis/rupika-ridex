@@ -108,6 +108,12 @@ body {
   transform: translateY(-1px);
 }
 
+.icon-button--profile:focus,
+.icon-button--profile:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* menu: global header navigation modal */
 body.menu-modal-open {
   overflow: hidden;
@@ -181,6 +187,12 @@ body.menu-modal-open {
   right: 0;
   top: 50%;
   transform: translateY(-50%);
+}
+
+.menu-modal__close:focus,
+.menu-modal__close:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .menu-modal__close,

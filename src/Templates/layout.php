@@ -6,6 +6,9 @@
 $title = $title ?? 'Ridex';
 $view = $view ?? null;
 $viewData = $viewData ?? [];
+$currentPage = strtolower(trim((string) ($page ?? '')));
+$isAdminPage = str_starts_with($currentPage, 'admin');
+$bodyClass = $isAdminPage ? 'admin-page' : '';
 ?>
 
 <!DOCTYPE html>
@@ -20,8 +23,9 @@ $viewData = $viewData ?? [];
 	/>
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 	<link rel="stylesheet" href="css/styles.css" />
+	<link rel="stylesheet" href="css/admin.css" />
 </head>
-<body>
+<body class="<?= htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8') ?>">
 	<?php include __DIR__ . '/../Views/partials/header.php'; ?>
 
 	<main class="page-content" role="main">
