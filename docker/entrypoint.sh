@@ -67,7 +67,13 @@ FLUSH PRIVILEGES;
 SQL
 
     php /var/www/html/bin/migrate.php
-    php /var/www/html/bin/seed.php
+
+    existing_vehicle_count="$(mysql --socket=/run/mysqld/mysqld.sock -N -s "$DB_NAME" -e "SELECT COUNT(*) FROM vehicles;" 2>/dev/null || echo 0)"
+    if [[ "${existing_vehicle_count:-0}" -eq 0 ]]; then
+        php /var/www/html/bin/seed.php
+    else
+        echo "Skipping seed: vehicles table already contains ${existing_vehicle_count} row(s)."
+    fi
 fi
 
 exec apache2-foreground
