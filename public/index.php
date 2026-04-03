@@ -59,6 +59,7 @@ if ($page === 'vehicles') {
 		]);
 		$vehicles = $statement->fetchAll() ?: [];
 	} catch (Throwable $exception) {
+		error_log('Vehicle listing query failed: ' . $exception->getMessage());
 		$vehicles = [];
 	}
 
@@ -100,6 +101,7 @@ if ($page === 'vehicles') {
 			]);
 			$vehicle = $statement->fetch() ?: null;
 		} catch (Throwable $exception) {
+			error_log('Vehicle detail query failed: ' . $exception->getMessage());
 			$vehicle = null;
 		}
 	}
@@ -195,6 +197,7 @@ if ($page === 'vehicles') {
 		]);
 		$featuredVehicles = $statement->fetchAll() ?: [];
 	} catch (Throwable $exception) {
+		error_log('Featured vehicle query failed: ' . $exception->getMessage());
 		$featuredVehicles = [];
 	}
 
