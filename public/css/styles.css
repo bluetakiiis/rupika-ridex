@@ -1,16 +1,6 @@
 /*
  * Purpose: Global site styles for customer-facing pages.
- * Sections (top-to-bottom render order):
- * 1) Base
- * 2) Header
- * 3) Hero
- * 4) Booking Engine
- * 5) Catalog & Cards
- * 6) Vehicle Detail
- * 7) Policy Pages
- * 8) Footer
- * 9) Responsive Overrides
- */
+*/
 
 :root {
   --color-main: #47e437;

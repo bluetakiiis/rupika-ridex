@@ -385,6 +385,77 @@ if ($page === 'vehicles') {
 	$title = 'Ridex | ' . $policy['title'];
 	$view = $policy['view'];
 	$viewData = [];
+} elseif ($page === 'admin-manage-fleet') {
+	// manage fleet: admin fleet page with DB-driven type/status filtering.
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');
+
+	if (!$isAdminSession) {
+		header('Location: index.php', true, 302);
+		exit;
+	}
+
+	$allowedFleetModes = ['type', 'status'];
+	$allowedFleetTypes = ['cars', 'bikes', 'luxury'];
+	$allowedFleetStatuses = ['reserved', 'on_trip', 'overdue', 'maintenance'];
+
+	$fleetMode = strtolower(trim((string) ($_GET['fleet_mode'] ?? 'type')));
+	if (!in_array($fleetMode, $allowedFleetModes, true)) {
+		$fleetMode = 'type';
+	}
+
+	$selectedFleetType = strtolower(trim((string) ($_GET['fleet_type'] ?? 'cars')));
+	if (!in_array($selectedFleetType, $allowedFleetTypes, true)) {
+		$selectedFleetType = 'cars';
+	}
+
+	$selectedFleetStatus = strtolower(trim((string) ($_GET['fleet_status'] ?? 'reserved')));
+	if (!in_array($selectedFleetStatus, $allowedFleetStatuses, true)) {
+		$selectedFleetStatus = 'reserved';
+	}
+
+	$fleetVehicles = [];
+	try {
+		$pdo = db();
+
+		if ($fleetMode === 'status') {
+			$fleetStmt = $pdo->prepare(
+				'SELECT id, short_name, full_name, image_path, status, vehicle_type
+				 FROM vehicles
+				 WHERE status = :status
+				 ORDER BY id DESC'
+			);
+			$fleetStmt->execute([
+				'status' => $selectedFleetStatus,
+			]);
+		} else {
+			$fleetStmt = $pdo->prepare(
+				'SELECT id, short_name, full_name, image_path, status, vehicle_type
+				 FROM vehicles
+				 WHERE vehicle_type = :vehicle_type AND status = :status
+				 ORDER BY id DESC'
+			);
+			$fleetStmt->execute([
+				'vehicle_type' => $selectedFleetType,
+				'status' => 'available',
+			]);
+		}
+
+		$fleetVehicles = $fleetStmt->fetchAll() ?: [];
+	} catch (Throwable $exception) {
+		error_log('Admin manage fleet data failed: ' . $exception->getMessage());
+		$fleetVehicles = [];
+	}
+
+	$title = 'Ridex | Manage Fleet';
+	$view = 'admin/vehicles/list';
+	$viewData = [
+		'adminUserName' => (string) ($sessionUser['name'] ?? 'Admin'),
+		'fleetMode' => $fleetMode,
+		'selectedFleetType' => $selectedFleetType,
+		'selectedFleetStatus' => $selectedFleetStatus,
+		'fleetVehicles' => $fleetVehicles,
+	];
 } elseif ($page === 'admin-dashboard') {
 	$sessionUser = $_SESSION['auth_user'] ?? [];
 	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');

@@ -103,7 +103,7 @@ if (!is_string($dashboardChartsJson)) {
 		<aside class="admin-sidebar" aria-label="Admin panel navigation">
 			<nav class="admin-sidebar__nav" aria-label="Admin sections">
 				<a class="admin-sidebar__link is-active" href="index.php?page=admin-dashboard" aria-current="page">Dashboard</a>
-				<span class="admin-sidebar__link is-disabled" aria-disabled="true">Manage Fleet</span>
+				<a class="admin-sidebar__link" href="index.php?page=admin-manage-fleet">Manage Fleet</a>
 				<span class="admin-sidebar__link is-disabled" aria-disabled="true">All Bookings</span>
 				<span class="admin-sidebar__link is-disabled" aria-disabled="true">Live Tracking</span>
 			</nav>
