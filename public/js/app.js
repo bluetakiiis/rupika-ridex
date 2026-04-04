@@ -46,7 +46,6 @@
 	const adminReadVehicleFuelNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-fuel]");
 	const adminReadVehiclePlateNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-plate]");
 	const adminReadStatusRowsNode = adminVehicleReadModal?.querySelector("[data-read-status-rows]");
-	const adminReadEditLink = adminVehicleReadModal?.querySelector("[data-read-edit-link]");
 	const adminReadDeleteAction = adminVehicleReadModal?.querySelector("[data-read-delete-action]");
 	const adminLoginForm = adminLoginModal?.querySelector("[data-admin-login-form]");
 	const adminLoginInputs = adminLoginModal
@@ -98,20 +97,44 @@
 		maintenance: "Maintenance",
 	};
 
+	const readUnavailableText = "unavailable";
+	const readUserNotApplicableText = "N/A";
+	const readUserStatuses = ["reserved", "on_trip", "overdue"];
+
 	const toTitleCase = (rawValue) =>
 		String(rawValue || "")
 			.replace(/[_-]+/g, " ")
 			.replace(/\b\w/g, (character) => character.toUpperCase());
 
-	const formatReadDate = (rawValue) => {
-		const text = String(rawValue || "").trim();
-		if (text === "") {
-			return "N/A";
+	const isReadValueMissing = (rawValue) =>
+		rawValue === null || rawValue === undefined || String(rawValue).trim() === "";
+
+	const getReadMissingFallback = (statusKey, isUserRelated = false) => {
+		if (isUserRelated && (statusKey === "available" || statusKey === "maintenance")) {
+			return readUserNotApplicableText;
 		}
+
+		return readUnavailableText;
+	};
+
+	const normalizeReadValue = (rawValue, statusKey, isUserRelated = false) => {
+		if (isReadValueMissing(rawValue)) {
+			return getReadMissingFallback(statusKey, isUserRelated);
+		}
+
+		return String(rawValue).trim();
+	};
+
+	const formatReadDate = (rawValue, statusKey, isUserRelated = false) => {
+		if (isReadValueMissing(rawValue)) {
+			return getReadMissingFallback(statusKey, isUserRelated);
+		}
+
+		const text = String(rawValue).trim();
 
 		const parsedDate = new Date(text.replace(" ", "T"));
 		if (Number.isNaN(parsedDate.getTime())) {
-			return "N/A";
+			return getReadMissingFallback(statusKey, isUserRelated);
 		}
 
 		const day = String(parsedDate.getDate()).padStart(2, "0");
@@ -121,10 +144,14 @@
 		return `${day} ${month}, ${year}`;
 	};
 
-	const formatReadCurrency = (rawValue) => {
-		const numericValue = Number.parseFloat(String(rawValue || "0"));
+	const formatReadCurrency = (rawValue, statusKey, isUserRelated = false) => {
+		if (isReadValueMissing(rawValue)) {
+			return getReadMissingFallback(statusKey, isUserRelated);
+		}
+
+		const numericValue = Number.parseFloat(String(rawValue).trim());
 		if (!Number.isFinite(numericValue)) {
-			return "$0.00";
+			return getReadMissingFallback(statusKey, isUserRelated);
 		}
 
 		return `$${numericValue.toFixed(2)}`;
@@ -140,56 +167,83 @@
 
 	const buildReadStatusRows = (statusKey, details) => {
 		const rows = [];
-		const formattedLastServiceDate = formatReadDate(details.lastServiceDate);
+		const formattedLastServiceDate = formatReadDate(details.lastServiceDate, statusKey, false);
 
 		if (statusKey === "available") {
 			rows.push(["Last Service Date", formattedLastServiceDate]);
-			rows.push(["Upcoming Reservations", formatReadDate(details.upcomingPickupDatetime)]);
-			rows.push(["Total Earnings", formatReadCurrency(details.totalEarnings)]);
-			rows.push(["Total Reservations", String(details.totalReservations || "0")]);
+			rows.push(["Upcoming Reservations", formatReadDate(details.upcomingPickupDatetime, statusKey, false)]);
+			rows.push(["Total Earnings", formatReadCurrency(details.totalEarnings, statusKey, false)]);
+			rows.push(["Total Reservations", normalizeReadValue(details.totalReservations, statusKey, false)]);
 			return rows;
 		}
 
 		if (statusKey === "reserved") {
+			const reservedPaymentStatus = normalizeReadValue(details.paymentStatus, statusKey, false);
 			rows.push(["Last Service Date", formattedLastServiceDate]);
-			rows.push(["Pickup Date", formatReadDate(details.pickupDatetime)]);
-			rows.push(["Return Date", formatReadDate(details.returnDatetime)]);
-			rows.push(["Payment Status", toTitleCase(details.paymentStatus || "Pending")]);
+			rows.push(["Pickup Date", formatReadDate(details.pickupDatetime, statusKey, false)]);
+			rows.push(["Return Date", formatReadDate(details.returnDatetime, statusKey, false)]);
+			rows.push([
+				"Payment Status",
+				reservedPaymentStatus === readUnavailableText ? readUnavailableText : toTitleCase(reservedPaymentStatus),
+			]);
 			return rows;
 		}
 
 		if (statusKey === "on_trip") {
+			const onTripPaymentStatus = normalizeReadValue(details.paymentStatus, statusKey, false);
 			rows.push(["Last Service Date", formattedLastServiceDate]);
-			rows.push(["Pickup Date", formatReadDate(details.pickupDatetime)]);
-			rows.push(["Return Date", formatReadDate(details.returnDatetime)]);
-			rows.push(["Current Location", details.currentLocation || "N/A"]);
-			rows.push(["Payment Status", toTitleCase(details.paymentStatus || "Pending")]);
+			rows.push(["Pickup Date", formatReadDate(details.pickupDatetime, statusKey, false)]);
+			rows.push(["Return Date", formatReadDate(details.returnDatetime, statusKey, false)]);
+			rows.push(["Current Location", normalizeReadValue(details.currentLocation, statusKey, false)]);
+			rows.push([
+				"Payment Status",
+				onTripPaymentStatus === readUnavailableText ? readUnavailableText : toTitleCase(onTripPaymentStatus),
+			]);
 			return rows;
 		}
 
 		if (statusKey === "overdue") {
-			let overdueDateLabel = formatReadDate(details.returnDatetime);
+			const overduePaymentStatus = normalizeReadValue(details.paymentStatus, statusKey, false);
+			let overdueDateLabel = formatReadDate(details.returnDatetime, statusKey, false);
 			const parsedReturnDatetime = new Date(String(details.returnDatetime || "").replace(" ", "T"));
-			if (!Number.isNaN(parsedReturnDatetime.getTime())) {
+			if (
+				overdueDateLabel !== readUnavailableText &&
+				overdueDateLabel !== readUserNotApplicableText &&
+				!Number.isNaN(parsedReturnDatetime.getTime())
+			) {
 				const nowTimestamp = Date.now();
 				const overdueHours = Math.floor((nowTimestamp - parsedReturnDatetime.getTime()) / (1000 * 60 * 60));
 				if (overdueHours > 0) {
-					overdueDateLabel += ` <span class="admin-vehicle-read-modal__overdue-hours">+${overdueHours} hours</span>`;
+					overdueDateLabel = `${escapeHtml(overdueDateLabel)} <span class="admin-vehicle-read-modal__overdue-hours">+${overdueHours} hours</span>`;
+				} else {
+					overdueDateLabel = escapeHtml(overdueDateLabel);
 				}
+			} else {
+				overdueDateLabel = escapeHtml(overdueDateLabel);
 			}
 
 			rows.push(["Last Service Date", formattedLastServiceDate]);
 			rows.push(["Return Date", overdueDateLabel, true]);
-			rows.push(["Current Location", details.currentLocation || "N/A"]);
-			rows.push(["Total Late Fee ($10/h)", formatReadCurrency(details.lateFee)]);
-			rows.push(["Payment Status", toTitleCase(details.paymentStatus || "Pending")]);
+			rows.push(["Current Location", normalizeReadValue(details.currentLocation, statusKey, false)]);
+			rows.push(["Total Late Fee ($10/h)", formatReadCurrency(details.lateFee, statusKey, false)]);
+			rows.push([
+				"Payment Status",
+				overduePaymentStatus === readUnavailableText ? readUnavailableText : toTitleCase(overduePaymentStatus),
+			]);
 			return rows;
 		}
 
-		rows.push(["Issue Description", details.description || "Scheduled maintenance"]); 
-		rows.push(["Workshop Name", "Ridex Service Center"]);
-		rows.push(["Est. Completion", formatReadDate(details.upcomingPickupDatetime || details.returnDatetime || details.lastServiceDate)]);
-		rows.push(["Service Cost", formatReadCurrency(details.lateFee || "120")]);
+		rows.push(["Issue Description", readUnavailableText]);
+		rows.push(["Workshop Name", normalizeReadValue(details.maintenanceWorkshop, statusKey, false)]);
+		rows.push([
+			"Est. Completion",
+			formatReadDate(
+				details.maintenanceEstimateDatetime || details.upcomingPickupDatetime || details.returnDatetime,
+				statusKey,
+				false
+			),
+		]);
+		rows.push(["Service Cost", formatReadCurrency(details.maintenanceCost, statusKey, false)]);
 		return rows;
 	};
 
@@ -244,6 +298,11 @@
 		const details = {
 			lastServiceDate: triggerButton.getAttribute("data-read-vehicle-last-service") || "",
 			description: triggerButton.getAttribute("data-read-vehicle-description") || "",
+			maintenanceWorkshop:
+				triggerButton.getAttribute("data-read-maintenance-workshop") || "",
+			maintenanceEstimateDatetime:
+				triggerButton.getAttribute("data-read-maintenance-estimate") || "",
+			maintenanceCost: triggerButton.getAttribute("data-read-maintenance-cost") || "",
 			upcomingPickupDatetime: triggerButton.getAttribute("data-read-upcoming-pickup") || "",
 			totalReservations: triggerButton.getAttribute("data-read-total-reservations") || "0",
 			totalEarnings: triggerButton.getAttribute("data-read-total-earnings") || "0",
@@ -254,17 +313,25 @@
 			currentLocation,
 		};
 
+		const isUserStatus = readUserStatuses.includes(vehicleStatus);
+
 		if (adminReadBookingNumberNode instanceof HTMLElement) {
-			const useBookingNumber = vehicleStatus === "reserved" || vehicleStatus === "on_trip" || vehicleStatus === "overdue";
-			adminReadBookingNumberNode.textContent = useBookingNumber && bookingNumber !== "" ? bookingNumber : "N/A";
+			adminReadBookingNumberNode.textContent = isUserStatus
+				? normalizeReadValue(bookingNumber, vehicleStatus, true)
+				: readUserNotApplicableText;
 		}
 
 		if (adminReadCurrentUserLine instanceof HTMLElement && adminReadCurrentUserNode instanceof HTMLElement) {
-			const shouldShowCurrentUser =
-				(vehicleStatus === "reserved" || vehicleStatus === "on_trip" || vehicleStatus === "overdue") &&
-				(bookingUserName !== "" || bookingUserPhone !== "");
-			adminReadCurrentUserLine.hidden = !shouldShowCurrentUser;
-			adminReadCurrentUserNode.textContent = `${bookingUserName || "N/A"} ${bookingUserPhone || ""}`.trim();
+			adminReadCurrentUserLine.hidden = !isUserStatus;
+
+			if (!isUserStatus) {
+				adminReadCurrentUserNode.textContent = "";
+			} else {
+				const hasFullUserDetails = !isReadValueMissing(bookingUserName) && !isReadValueMissing(bookingUserPhone);
+				adminReadCurrentUserNode.textContent = hasFullUserDetails
+					? `${String(bookingUserName).trim()} ${String(bookingUserPhone).trim()}`
+					: readUnavailableText;
+			}
 		}
 
 		if (adminReadStatusPill instanceof HTMLElement) {
@@ -273,7 +340,9 @@
 		}
 
 		if (adminReadMaintenanceIndicator instanceof HTMLElement) {
-			adminReadMaintenanceIndicator.hidden = vehicleStatus !== "available";
+			const showMaintenanceIndicator =
+				vehicleStatus === "available" || vehicleStatus === "maintenance";
+			adminReadMaintenanceIndicator.hidden = !showMaintenanceIndicator;
 		}
 
 		if (adminReadVehicleImage instanceof HTMLImageElement) {
@@ -290,29 +359,43 @@
 		}
 
 		if (adminReadVehicleSeatsNode instanceof HTMLElement) {
-			const seatsValue = triggerButton.getAttribute("data-read-vehicle-seats") || "0";
-			adminReadVehicleSeatsNode.textContent = `${seatsValue} Seats`;
+			const seatsValue = normalizeReadValue(
+				triggerButton.getAttribute("data-read-vehicle-seats"),
+				vehicleStatus,
+				false
+			);
+			adminReadVehicleSeatsNode.textContent =
+				seatsValue === readUnavailableText ? readUnavailableText : `${seatsValue} Seats`;
 		}
 
 		if (adminReadVehicleTransmissionNode instanceof HTMLElement) {
 			adminReadVehicleTransmissionNode.textContent = toTitleCase(
-				triggerButton.getAttribute("data-read-vehicle-transmission") || "N/A"
+				normalizeReadValue(triggerButton.getAttribute("data-read-vehicle-transmission"), vehicleStatus, false)
 			);
 		}
 
 		if (adminReadVehicleAgeNode instanceof HTMLElement) {
-			const ageValue = triggerButton.getAttribute("data-read-vehicle-age") || "0";
-			adminReadVehicleAgeNode.textContent = `${ageValue}+ Years`;
+			const ageValue = normalizeReadValue(
+				triggerButton.getAttribute("data-read-vehicle-age"),
+				vehicleStatus,
+				false
+			);
+			adminReadVehicleAgeNode.textContent =
+				ageValue === readUnavailableText ? readUnavailableText : `${ageValue}+ Years`;
 		}
 
 		if (adminReadVehicleFuelNode instanceof HTMLElement) {
 			adminReadVehicleFuelNode.textContent = toTitleCase(
-				triggerButton.getAttribute("data-read-vehicle-fuel") || "Fuel"
+				normalizeReadValue(triggerButton.getAttribute("data-read-vehicle-fuel"), vehicleStatus, false)
 			);
 		}
 
 		if (adminReadVehiclePlateNode instanceof HTMLElement) {
-			adminReadVehiclePlateNode.textContent = triggerButton.getAttribute("data-read-vehicle-plate") || "N/A";
+			adminReadVehiclePlateNode.textContent = normalizeReadValue(
+				triggerButton.getAttribute("data-read-vehicle-plate"),
+				vehicleStatus,
+				false
+			);
 		}
 
 		updateReadStatusRows(vehicleStatus, details);
@@ -334,20 +417,6 @@
 				"data-delete-fleet-status",
 				triggerButton.getAttribute("data-delete-fleet-status") || "reserved"
 			);
-		}
-
-		if (adminReadEditLink instanceof HTMLAnchorElement) {
-			const mode = triggerButton.getAttribute("data-delete-fleet-mode") || "type";
-			const type = triggerButton.getAttribute("data-delete-fleet-type") || "cars";
-			const status = triggerButton.getAttribute("data-delete-fleet-status") || "reserved";
-			const query = new URLSearchParams({ page: "admin-manage-fleet", fleet_mode: mode });
-			if (mode === "status") {
-				query.set("fleet_status", status);
-			} else {
-				query.set("fleet_type", type);
-			}
-
-			adminReadEditLink.href = `index.php?${query.toString()}`;
 		}
 	};
 

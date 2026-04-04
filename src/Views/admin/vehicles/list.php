@@ -112,7 +112,7 @@ if ($fleetMode === 'status') {
 				<?php if ($fleetMode !== 'status'): ?>
 					<div class="admin-fleet__actions">
 						<a class="admin-fleet__pill admin-fleet__pill--outline-red" href="<?= htmlspecialchars($buildFleetUrl('status', 'reserved'), ENT_QUOTES, 'UTF-8') ?>">Unavailable</a>
-						<a class="admin-fleet__pill admin-fleet__pill--fill-green" href="index.php?page=admin-manage-fleet">Create</a>
+						<button class="admin-fleet__pill admin-fleet__pill--fill-green" type="button">Create</button>
 					</div>
 				<?php endif; ?>
 			</div>
@@ -194,7 +194,7 @@ if ($fleetMode === 'status') {
 
 						<?php // manage fleet delete: opens delete confirmation modal with selected vehicle context. ?>
 						<div class="admin-fleet-card__actions<?= $fleetMode === 'status' ? ' admin-fleet-card__actions--single' : '' ?>">
-							<a class="admin-fleet-card__btn admin-fleet-card__btn--edit" href="index.php?page=admin-manage-fleet">Edit</a>
+							<button class="admin-fleet-card__btn admin-fleet-card__btn--edit" type="button">Edit</button>
 							<?php if ($fleetMode !== 'status'): ?>
 								<button
 									class="admin-fleet-card__btn admin-fleet-card__btn--delete"

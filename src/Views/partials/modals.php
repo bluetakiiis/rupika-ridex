@@ -162,19 +162,17 @@ if ($adminProfilePhone === '') {
 					/>
 				</div>
 
-				<div class="admin-vehicle-read-modal__header-actions">
-					<span class="material-symbols-rounded admin-vehicle-read-modal__maintenance-indicator" aria-hidden="true" data-read-maintenance-indicator hidden>build</span>
-					<button class="menu-modal__close" type="button" aria-label="Close vehicle read prompt" data-modal-close>
-						<span class="material-symbols-rounded" aria-hidden="true">close</span>
-					</button>
-				</div>
+				<span class="material-symbols-rounded admin-vehicle-read-modal__maintenance-indicator" aria-hidden="true" data-read-maintenance-indicator hidden>build</span>
+				<button class="menu-modal__close" type="button" aria-label="Close vehicle read prompt" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
 			</header>
 
 			<div class="admin-vehicle-read-modal__content">
 				<div class="admin-vehicle-read-modal__headline">
 					<div class="admin-vehicle-read-modal__booking-block">
 						<p class="admin-vehicle-read-modal__booking-number">Booking Number: <span data-read-booking-number>N/A</span></p>
-						<p class="admin-vehicle-read-modal__current-user" data-read-current-user-line hidden>Current User: <span data-read-current-user>Not assigned</span></p>
+						<p class="admin-vehicle-read-modal__current-user" data-read-current-user-line>Current User: <span data-read-current-user>N/A</span></p>
 					</div>
 					<span class="admin-vehicle-read-modal__status-pill admin-vehicle-read-modal__status-pill--available" data-read-status-pill>Available</span>
 				</div>
@@ -202,13 +200,13 @@ if ($adminProfilePhone === '') {
 					<tbody data-read-status-rows>
 						<tr>
 							<th scope="row">Last Service Date</th>
-							<td>N/A</td>
+							<td>unavailable</td>
 						</tr>
 					</tbody>
 				</table>
 
 				<div class="admin-vehicle-read-modal__actions">
-					<a class="admin-vehicle-read-modal__edit" href="index.php?page=admin-manage-fleet" data-read-edit-link>Edit</a>
+					<button class="admin-vehicle-read-modal__edit" type="button">Edit</button>
 					<button
 						class="admin-vehicle-read-modal__delete"
 						type="button"
