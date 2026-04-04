@@ -361,6 +361,7 @@
 /* read modal reference: C:\Users\User\Downloads\Ridex includes the 5-status read examples, and available status has an extra maintenance icon. */
 .admin-vehicle-read-modal__dialog {
   gap: 12px;
+  overflow: hidden;
 }
 
 .admin-vehicle-read-modal__header {
@@ -375,6 +376,10 @@
   color: #8f8f8f;
   font-size: 25px;
   line-height: 1;
+}
+
+.admin-vehicle-read-modal__maintenance-indicator[hidden] {
+  display: none !important;
 }
 
 .admin-vehicle-read-modal__content {
@@ -603,6 +608,10 @@
 .admin-vehicle-read-modal__delete:hover,
 .admin-vehicle-read-modal__delete:focus-visible {
   background: rgba(255, 0, 4, 0.08);
+}
+
+.admin-vehicle-read-modal__delete[hidden] {
+  display: none !important;
 }
 
 @media (max-width: 860px) {

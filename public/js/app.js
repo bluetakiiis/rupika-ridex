@@ -282,6 +282,7 @@
 		const vehicleStatus = Object.prototype.hasOwnProperty.call(readStatusLabels, vehicleStatusRaw)
 			? vehicleStatusRaw
 			: "available";
+		const fleetModeForReadModal = triggerButton.getAttribute("data-delete-fleet-mode") || "type";
 
 		const bookingNumber = triggerButton.getAttribute("data-read-booking-number") || "";
 		const bookingUserName = triggerButton.getAttribute("data-read-booking-user-name") || "";
@@ -341,7 +342,7 @@
 
 		if (adminReadMaintenanceIndicator instanceof HTMLElement) {
 			const showMaintenanceIndicator =
-				vehicleStatus === "available" || vehicleStatus === "maintenance";
+				fleetModeForReadModal === "type" && vehicleStatus === "available";
 			adminReadMaintenanceIndicator.hidden = !showMaintenanceIndicator;
 		}
 
@@ -401,13 +402,14 @@
 		updateReadStatusRows(vehicleStatus, details);
 
 		if (adminReadDeleteAction instanceof HTMLElement) {
-			const canDeleteFromReadModal = vehicleStatus === "available";
+			const canDeleteFromReadModal =
+				fleetModeForReadModal === "type" && vehicleStatus === "available";
 			adminReadDeleteAction.hidden = !canDeleteFromReadModal;
 			adminReadDeleteAction.setAttribute("data-delete-vehicle-id", String(vehicleId > 0 ? vehicleId : ""));
 			adminReadDeleteAction.setAttribute("data-delete-vehicle-label", vehicleName);
 			adminReadDeleteAction.setAttribute(
 				"data-delete-fleet-mode",
-				triggerButton.getAttribute("data-delete-fleet-mode") || "type"
+				fleetModeForReadModal
 			);
 			adminReadDeleteAction.setAttribute(
 				"data-delete-fleet-type",
