@@ -19,8 +19,20 @@ if (!in_array($vehicleSyncStrategy, ['db-first', 'json-first'], true)) {
 	$vehicleSyncStrategy = $defaultVehicleSyncStrategy;
 }
 
+$toBoolEnv = static function ($value): bool {
+	$normalized = strtolower(trim((string) $value));
+	return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+};
+
+$defaultLegacyMirror = strtolower((string) env('APP_ENV', 'production')) === 'local' ? '1' : '0';
+$enableLegacyVehicleJsonMirror = $toBoolEnv(env('ENABLE_LEGACY_JSON_MIRROR', $defaultLegacyMirror));
+
 $legacyVehicleJsonSyncDir = APP_ROOT . '/var/cache/vehicles-json';
-$mirrorVehicleJsonFiles = static function (string $sourceDir, string $targetDir): void {
+$mirrorVehicleJsonFiles = static function (string $sourceDir, string $targetDir) use ($enableLegacyVehicleJsonMirror): void {
+	if (!$enableLegacyVehicleJsonMirror) {
+		return;
+	}
+
 	$vehicleTypes = ['cars', 'bikes', 'luxury'];
 	if (!is_dir($sourceDir)) {
 		return;

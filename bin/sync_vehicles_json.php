@@ -9,7 +9,19 @@ require_once __DIR__ . '/../src/Helpers/vehicle_json_sync.php';
 $trackedJsonDir = APP_ROOT . '/data/vehicles-json';
 $legacyJsonDir = APP_ROOT . '/var/cache/vehicles-json';
 
-$mirrorVehicleJsonFiles = static function (string $sourceDir, string $targetDir): void {
+$toBoolEnv = static function ($value): bool {
+	$normalized = strtolower(trim((string) $value));
+	return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+};
+
+$defaultLegacyMirror = strtolower((string) env('APP_ENV', 'production')) === 'local' ? '1' : '0';
+$enableLegacyVehicleJsonMirror = $toBoolEnv(env('ENABLE_LEGACY_JSON_MIRROR', $defaultLegacyMirror));
+
+$mirrorVehicleJsonFiles = static function (string $sourceDir, string $targetDir) use ($enableLegacyVehicleJsonMirror): void {
+	if (!$enableLegacyVehicleJsonMirror) {
+		return;
+	}
+
 	$vehicleTypes = ['cars', 'bikes', 'luxury'];
 	if (!is_dir($sourceDir)) {
 		return;
