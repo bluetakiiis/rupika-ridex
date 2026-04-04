@@ -11,6 +11,13 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 
 $vehicleJsonSyncDir = APP_ROOT . '/data/vehicles-json';
+$defaultVehicleSyncStrategy = strtolower((string) env('APP_ENV', 'production')) === 'production'
+	? 'db-first'
+	: 'json-first';
+$vehicleSyncStrategy = strtolower(trim((string) env('VEHICLE_SYNC_STRATEGY', $defaultVehicleSyncStrategy)));
+if (!in_array($vehicleSyncStrategy, ['db-first', 'json-first'], true)) {
+	$vehicleSyncStrategy = $defaultVehicleSyncStrategy;
+}
 
 // admin login: shared form state for login modal
 $adminLoginError = '';
@@ -309,9 +316,10 @@ if ($isAdminLoginPost) {
 	}
 }
 
-$runVehicleSync = static function (bool $preferDbTimestamps = false) use ($vehicleJsonSyncDir): void {
+$runVehicleSync = static function (bool $preferDbTimestamps = false) use ($vehicleJsonSyncDir, $vehicleSyncStrategy): void {
 	try {
-		$syncOptions = $preferDbTimestamps
+		$useDbPriority = $preferDbTimestamps || $vehicleSyncStrategy === 'db-first';
+		$syncOptions = $useDbPriority
 			? [
 				'prefer_json' => false,
 				'prefer_db_timestamps' => true,

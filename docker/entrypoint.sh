@@ -69,7 +69,12 @@ SQL
     php /var/www/html/bin/migrate.php
 
     if is_true "${APPLY_DB_SNAPSHOT_ON_BOOT:-1}"; then
-        php /var/www/html/bin/import_db_snapshot.php --if-missing-ok
+        existing_core_rows="$(mysql --socket=/run/mysqld/mysqld.sock -N -s "$DB_NAME" -e "SELECT (SELECT COUNT(*) FROM users) + (SELECT COUNT(*) FROM categories) + (SELECT COUNT(*) FROM vehicles) + (SELECT COUNT(*) FROM bookings) + (SELECT COUNT(*) FROM payments) + (SELECT COUNT(*) FROM gps_logs);" 2>/dev/null || echo 0)"
+        if [[ "${existing_core_rows:-0}" -eq 0 ]]; then
+            php /var/www/html/bin/import_db_snapshot.php --if-missing-ok
+        else
+            echo "Skipping snapshot import: database already has ${existing_core_rows} core row(s)."
+        fi
     fi
 
     existing_vehicle_count="$(mysql --socket=/run/mysqld/mysqld.sock -N -s "$DB_NAME" -e "SELECT COUNT(*) FROM vehicles;" 2>/dev/null || echo 0)"

@@ -42,7 +42,7 @@ If you cannot pay for a separate Render DB service, deploy only the web service 
 - On container boot, it will:
   - start MariaDB locally,
   - run `php bin/migrate.php`,
-  - run `php bin/import_db_snapshot.php --if-missing-ok` (unless `APPLY_DB_SNAPSHOT_ON_BOOT=0`),
+  - run `php bin/import_db_snapshot.php --if-missing-ok` only when DB is empty (unless `APPLY_DB_SNAPSHOT_ON_BOOT=0`),
   - run `php bin/seed.php`,
   - start Apache.
 
@@ -83,6 +83,8 @@ Notes:
   - `luxury.json`
 - Public requests trigger sync automatically in `public/index.php` before and after page handling.
 - Keep these JSON files committed so Render deployments use the same vehicle inventory as local.
+- In production (`APP_ENV=production`), vehicle sync defaults to DB-first so website create/edit/delete changes persist in DB and are not overwritten by stale JSON.
+- To force JSON-first behavior, set `VEHICLE_SYNC_STRATEGY=json-first`.
 - Manual/cron sync command:
   - `php bin/sync_vehicles_json.php`
 - Default conflict rule: latest update wins across JSON and DB.
