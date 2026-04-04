@@ -147,6 +147,86 @@ if ($adminProfilePhone === '') {
 		</section>
 	</div>
 
+	<?php // read modal reference: C:\Users\User\Downloads\Ridex includes the 5-status read examples, and available status has an extra maintenance icon. ?>
+	<div class="menu-modal admin-vehicle-read-modal" id="admin-vehicle-read-modal" hidden aria-hidden="true" data-modal-id="admin-vehicle-read-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog admin-vehicle-read-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="admin-vehicle-read-title">
+			<header class="menu-modal__header admin-vehicle-read-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex vehicle details">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<div class="admin-vehicle-read-modal__header-actions">
+					<span class="material-symbols-rounded admin-vehicle-read-modal__maintenance-indicator" aria-hidden="true" data-read-maintenance-indicator hidden>build</span>
+					<button class="menu-modal__close" type="button" aria-label="Close vehicle read prompt" data-modal-close>
+						<span class="material-symbols-rounded" aria-hidden="true">close</span>
+					</button>
+				</div>
+			</header>
+
+			<div class="admin-vehicle-read-modal__content">
+				<div class="admin-vehicle-read-modal__headline">
+					<div class="admin-vehicle-read-modal__booking-block">
+						<p class="admin-vehicle-read-modal__booking-number">Booking Number: <span data-read-booking-number>N/A</span></p>
+						<p class="admin-vehicle-read-modal__current-user" data-read-current-user-line hidden>Current User: <span data-read-current-user>Not assigned</span></p>
+					</div>
+					<span class="admin-vehicle-read-modal__status-pill admin-vehicle-read-modal__status-pill--available" data-read-status-pill>Available</span>
+				</div>
+
+				<div class="admin-vehicle-read-modal__hero">
+					<div class="admin-vehicle-read-modal__image-wrap">
+						<img src="images/vehicle-feature.png" alt="Vehicle" class="admin-vehicle-read-modal__image" data-read-vehicle-image onerror="this.onerror=null;this.src='images/vehicle-feature.png';" />
+					</div>
+
+					<div class="admin-vehicle-read-modal__meta">
+						<h2 class="admin-vehicle-read-modal__type" id="admin-vehicle-read-title" data-read-vehicle-type>Car</h2>
+						<p class="admin-vehicle-read-modal__full-name" data-read-vehicle-full-name>Vehicle</p>
+
+						<ul class="admin-vehicle-read-modal__specs" aria-label="Vehicle specifications">
+							<li><span class="material-symbols-rounded" aria-hidden="true">person</span><span data-read-vehicle-seats>0 Seats</span></li>
+							<li><span class="material-symbols-rounded" aria-hidden="true">directions_car</span><span data-read-vehicle-transmission>N/A</span></li>
+							<li><span class="material-symbols-rounded" aria-hidden="true">badge</span><span data-read-vehicle-age>0+ Years</span></li>
+							<li><span class="material-symbols-rounded" aria-hidden="true">local_gas_station</span><span data-read-vehicle-fuel>Fuel</span></li>
+							<li><span class="material-symbols-rounded" aria-hidden="true">id_card</span><span data-read-vehicle-plate>N/A</span></li>
+						</ul>
+					</div>
+				</div>
+
+				<table class="admin-vehicle-read-modal__table" aria-label="Vehicle status details">
+					<tbody data-read-status-rows>
+						<tr>
+							<th scope="row">Last Service Date</th>
+							<td>N/A</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<div class="admin-vehicle-read-modal__actions">
+					<a class="admin-vehicle-read-modal__edit" href="index.php?page=admin-manage-fleet" data-read-edit-link>Edit</a>
+					<button
+						class="admin-vehicle-read-modal__delete"
+						type="button"
+						data-modal-target="admin-delete-vehicle-modal"
+						data-read-delete-action
+						hidden
+					>
+						Delete
+					</button>
+				</div>
+			</div>
+
+			<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+				<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+			</button>
+		</section>
+	</div>
+
 	<?php // admin fleet delete: vehicle delete confirmation modal (same sizing/layout as logout modal). ?>
 	<div class="menu-modal admin-logout-modal" id="admin-delete-vehicle-modal" hidden aria-hidden="true" data-modal-id="admin-delete-vehicle-modal">
 		<div class="menu-modal__overlay" data-modal-close></div>

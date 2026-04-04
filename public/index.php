@@ -544,22 +544,83 @@ if ($page === 'vehicles') {
 	try {
 		$pdo = db();
 
+		$fleetBaseSelectSql = "
+			SELECT
+				v.id,
+				v.short_name,
+				v.full_name,
+				v.image_path,
+				v.status,
+				v.vehicle_type,
+				v.number_of_seats,
+				v.transmission_type,
+				v.fuel_type,
+				v.driver_age_requirement,
+				v.license_plate,
+				v.last_service_date,
+				v.description,
+				latest_booking.booking_number AS active_booking_number,
+				latest_booking.pickup_datetime AS active_pickup_datetime,
+				latest_booking.return_datetime AS active_return_datetime,
+				latest_booking.payment_status AS active_payment_status,
+				latest_booking.late_fee AS active_late_fee,
+				booking_user.name AS active_booking_user_name,
+				booking_user.phone AS active_booking_user_phone,
+				latest_gps.latitude AS gps_latitude,
+				latest_gps.longitude AS gps_longitude,
+				upcoming_booking.pickup_datetime AS upcoming_pickup_datetime,
+				COALESCE(vehicle_stats.total_reservations, 0) AS total_reservations,
+				COALESCE(vehicle_stats.total_earnings, 0) AS total_earnings
+			FROM vehicles v
+			LEFT JOIN bookings latest_booking ON latest_booking.id = (
+				SELECT b1.id
+				FROM bookings b1
+				WHERE b1.vehicle_id = v.id
+					AND b1.status IN ('reserved', 'ready', 'on_trip', 'overdue', 'pending')
+				ORDER BY COALESCE(b1.updated_at, b1.created_at) DESC, b1.id DESC
+				LIMIT 1
+			)
+			LEFT JOIN users booking_user ON booking_user.id = latest_booking.user_id
+			LEFT JOIN gps_logs latest_gps ON latest_gps.id = (
+				SELECT g1.id
+				FROM gps_logs g1
+				WHERE g1.vehicle_id = v.id
+				ORDER BY COALESCE(g1.timestamp, g1.created_at) DESC, g1.id DESC
+				LIMIT 1
+			)
+			LEFT JOIN bookings upcoming_booking ON upcoming_booking.id = (
+				SELECT b2.id
+				FROM bookings b2
+				WHERE b2.vehicle_id = v.id
+					AND b2.status IN ('reserved', 'ready', 'pending')
+					AND b2.pickup_datetime >= CURRENT_TIMESTAMP
+				ORDER BY b2.pickup_datetime ASC, b2.id ASC
+				LIMIT 1
+			)
+			LEFT JOIN (
+				SELECT
+					vehicle_id,
+					COUNT(*) AS total_reservations,
+					COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN paid_amount ELSE 0 END), 0) AS total_earnings
+				FROM bookings
+				GROUP BY vehicle_id
+			) vehicle_stats ON vehicle_stats.vehicle_id = v.id
+		";
+
 		if ($fleetMode === 'status') {
 			$fleetStmt = $pdo->prepare(
-				'SELECT id, short_name, full_name, image_path, status, vehicle_type
-				 FROM vehicles
-				 WHERE status = :status
-				 ORDER BY id DESC'
+				$fleetBaseSelectSql . '
+				WHERE v.status = :status
+				ORDER BY v.id DESC'
 			);
 			$fleetStmt->execute([
 				'status' => $selectedFleetStatus,
 			]);
 		} else {
 			$fleetStmt = $pdo->prepare(
-				'SELECT id, short_name, full_name, image_path, status, vehicle_type
-				 FROM vehicles
-				 WHERE vehicle_type = :vehicle_type AND status = :status
-				 ORDER BY id DESC'
+				$fleetBaseSelectSql . '
+				WHERE v.vehicle_type = :vehicle_type AND v.status = :status
+				ORDER BY v.id DESC'
 			);
 			$fleetStmt->execute([
 				'vehicle_type' => $selectedFleetType,

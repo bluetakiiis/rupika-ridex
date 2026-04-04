@@ -55,6 +55,10 @@ $resolveVehicleImage = static function (array $vehicle): string {
 	return $imagePath;
 };
 
+$resolveVehicleValue = static function (array $vehicle, string $key): string {
+	return trim((string) ($vehicle[$key] ?? ''));
+};
+
 $fleetEmptyMessage = 'No available vehicles.';
 if ($fleetMode === 'status') {
 	$statusLabel = $statusTabs[$selectedFleetStatus] ?? 'Selected';
@@ -119,15 +123,71 @@ if ($fleetMode === 'status') {
 					<?php
 					$vehicleName = $resolveVehicleName($vehicle);
 					$vehicleImage = $resolveVehicleImage($vehicle);
+					$vehicleStatus = strtolower($resolveVehicleValue($vehicle, 'status'));
+					$vehicleType = strtolower($resolveVehicleValue($vehicle, 'vehicle_type'));
+					$vehicleSeats = $resolveVehicleValue($vehicle, 'number_of_seats');
+					$vehicleTransmission = $resolveVehicleValue($vehicle, 'transmission_type');
+					$vehicleFuel = $resolveVehicleValue($vehicle, 'fuel_type');
+					$vehicleAgeRequirement = $resolveVehicleValue($vehicle, 'driver_age_requirement');
+					$vehiclePlate = $resolveVehicleValue($vehicle, 'license_plate');
+					$vehicleLastService = $resolveVehicleValue($vehicle, 'last_service_date');
+					$vehicleDescription = $resolveVehicleValue($vehicle, 'description');
+					$activeBookingNumber = $resolveVehicleValue($vehicle, 'active_booking_number');
+					$activeBookingUserName = $resolveVehicleValue($vehicle, 'active_booking_user_name');
+					$activeBookingUserPhone = $resolveVehicleValue($vehicle, 'active_booking_user_phone');
+					$activePickupDatetime = $resolveVehicleValue($vehicle, 'active_pickup_datetime');
+					$activeReturnDatetime = $resolveVehicleValue($vehicle, 'active_return_datetime');
+					$activePaymentStatus = $resolveVehicleValue($vehicle, 'active_payment_status');
+					$activeLateFee = $resolveVehicleValue($vehicle, 'active_late_fee');
+					$gpsLatitude = $resolveVehicleValue($vehicle, 'gps_latitude');
+					$gpsLongitude = $resolveVehicleValue($vehicle, 'gps_longitude');
+					$upcomingPickupDatetime = $resolveVehicleValue($vehicle, 'upcoming_pickup_datetime');
+					$totalReservations = $resolveVehicleValue($vehicle, 'total_reservations');
+					$totalEarnings = $resolveVehicleValue($vehicle, 'total_earnings');
 					?>
 					<article class="admin-fleet-card">
 						<div class="admin-fleet-card__image-wrap">
-							<img
-								src="<?= htmlspecialchars($vehicleImage, ENT_QUOTES, 'UTF-8') ?>"
-								alt="<?= htmlspecialchars($vehicleName, ENT_QUOTES, 'UTF-8') ?>"
-								class="admin-fleet-card__image"
-								onerror="this.onerror=null;this.src='images/vehicle-feature.png';"
-							/>
+							<?php // read modal reference: C:\Users\User\Downloads\Ridex includes the 5-status read examples, and available status has an extra maintenance icon. ?>
+							<button
+								class="admin-fleet-card__image-button"
+								type="button"
+								data-modal-target="admin-vehicle-read-modal"
+								data-read-vehicle-id="<?= (int) ($vehicle['id'] ?? 0) ?>"
+								data-read-vehicle-name="<?= htmlspecialchars($vehicleName, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-full-name="<?= htmlspecialchars($resolveVehicleValue($vehicle, 'full_name'), ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-type="<?= htmlspecialchars($vehicleType, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-status="<?= htmlspecialchars($vehicleStatus, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-image="<?= htmlspecialchars($vehicleImage, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-seats="<?= htmlspecialchars($vehicleSeats, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-transmission="<?= htmlspecialchars($vehicleTransmission, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-age="<?= htmlspecialchars($vehicleAgeRequirement, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-fuel="<?= htmlspecialchars($vehicleFuel, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-plate="<?= htmlspecialchars($vehiclePlate, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-last-service="<?= htmlspecialchars($vehicleLastService, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-description="<?= htmlspecialchars($vehicleDescription, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-booking-number="<?= htmlspecialchars($activeBookingNumber, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-booking-user-name="<?= htmlspecialchars($activeBookingUserName, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-booking-user-phone="<?= htmlspecialchars($activeBookingUserPhone, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-booking-pickup="<?= htmlspecialchars($activePickupDatetime, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-booking-return="<?= htmlspecialchars($activeReturnDatetime, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-booking-payment-status="<?= htmlspecialchars($activePaymentStatus, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-booking-late-fee="<?= htmlspecialchars($activeLateFee, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-gps-latitude="<?= htmlspecialchars($gpsLatitude, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-gps-longitude="<?= htmlspecialchars($gpsLongitude, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-upcoming-pickup="<?= htmlspecialchars($upcomingPickupDatetime, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-total-reservations="<?= htmlspecialchars($totalReservations, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-total-earnings="<?= htmlspecialchars($totalEarnings, ENT_QUOTES, 'UTF-8') ?>"
+								data-delete-fleet-mode="<?= htmlspecialchars($fleetMode, ENT_QUOTES, 'UTF-8') ?>"
+								data-delete-fleet-type="<?= htmlspecialchars($selectedFleetType, ENT_QUOTES, 'UTF-8') ?>"
+								data-delete-fleet-status="<?= htmlspecialchars($selectedFleetStatus, ENT_QUOTES, 'UTF-8') ?>"
+							>
+								<img
+									src="<?= htmlspecialchars($vehicleImage, ENT_QUOTES, 'UTF-8') ?>"
+									alt="<?= htmlspecialchars($vehicleName, ENT_QUOTES, 'UTF-8') ?>"
+									class="admin-fleet-card__image"
+									onerror="this.onerror=null;this.src='images/vehicle-feature.png';"
+								/>
+							</button>
 						</div>
 
 						<h2 class="admin-fleet-card__name"><?= htmlspecialchars($vehicleName, ENT_QUOTES, 'UTF-8') ?></h2>
