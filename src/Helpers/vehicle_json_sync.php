@@ -7,8 +7,11 @@ if (!function_exists('sync_vehicles_json_bidirectional')) {
 	function sync_vehicles_json_bidirectional(PDO $pdo, string $jsonDirectory, array $options = []): array
 	{
 		$allowedTypes = ['cars', 'bikes', 'luxury'];
-		$preferJson = !empty($options['prefer_json']);
+		$preferJson = array_key_exists('prefer_json', $options) ? !empty($options['prefer_json']) : true;
 		$preferDbTimestamps = !empty($options['prefer_db_timestamps']);
+		if ($preferDbTimestamps) {
+			$preferJson = false;
+		}
 		$jsonDirectory = rtrim($jsonDirectory, "\\/");
 
 		if (!is_dir($jsonDirectory) && !mkdir($jsonDirectory, 0775, true) && !is_dir($jsonDirectory)) {
@@ -206,6 +209,8 @@ if (!function_exists('vehicle_sync_read_json_snapshot')) {
 					continue;
 				}
 
+				$row = vehicle_sync_normalize_json_vehicle_row($row, $defaultType, $allowedTypes);
+
 				$licensePlate = strtoupper(trim((string) ($row['license_plate'] ?? '')));
 				if ($licensePlate === '') {
 					continue;
@@ -228,6 +233,106 @@ if (!function_exists('vehicle_sync_read_json_snapshot')) {
 			'row_hashes_by_plate' => $rowHashesByPlate,
 			'file_mtime_by_type' => $fileMtimeByType,
 		];
+	}
+}
+
+if (!function_exists('vehicle_sync_normalize_json_vehicle_row')) {
+	function vehicle_sync_normalize_json_vehicle_row(array $row, string $defaultType, array $allowedTypes): array
+	{
+		$normalized = $row;
+
+		$canonicalMap = [
+			'vehicle_type' => ['vehicle_type', 'vehicleType', 'type'],
+			'short_name' => ['short_name', 'shortName', 'name'],
+			'full_name' => ['full_name', 'fullName', 'model_name', 'modelName'],
+			'price_per_day' => ['price_per_day', 'pricePerDay', 'price'],
+			'driver_age_requirement' => ['driver_age_requirement', 'driverAgeRequirement', 'minimum_driver_age', 'minimumDriverAge'],
+			'image_path' => ['image_path', 'imagePath', 'image'],
+			'number_of_seats' => ['number_of_seats', 'numberOfSeats', 'seats'],
+			'transmission_type' => ['transmission_type', 'transmissionType', 'transmission'],
+			'fuel_type' => ['fuel_type', 'fuelType', 'fuel'],
+			'status' => ['status', 'availability'],
+			'gps_id' => ['gps_id', 'gpsId'],
+			'last_service_date' => ['last_service_date', 'lastServiceDate'],
+			'description' => ['description', 'details'],
+			'created_at' => ['created_at', 'createdAt'],
+			'updated_at' => ['updated_at', 'updatedAt'],
+		];
+
+		foreach ($canonicalMap as $targetKey => $candidateKeys) {
+			$value = vehicle_sync_get_row_value_by_alias($row, $candidateKeys);
+			if ($value !== null) {
+				$normalized[$targetKey] = $value;
+			}
+		}
+
+		$licensePlate = vehicle_sync_extract_license_plate($row);
+		if ($licensePlate !== '') {
+			$normalized['license_plate'] = $licensePlate;
+		}
+
+		$vehicleType = strtolower(trim((string) ($normalized['vehicle_type'] ?? $defaultType)));
+		if (!in_array($vehicleType, $allowedTypes, true)) {
+			$vehicleType = $defaultType;
+		}
+		$normalized['vehicle_type'] = $vehicleType;
+
+		return $normalized;
+	}
+}
+
+if (!function_exists('vehicle_sync_extract_license_plate')) {
+	function vehicle_sync_extract_license_plate(array $row): string
+	{
+		$value = vehicle_sync_get_row_value_by_alias(
+			$row,
+			[
+				'license_plate',
+				'licensePlate',
+				'plate',
+				'plate_number',
+				'plateNumber',
+				'vehicle_plate',
+				'vehiclePlate',
+				'registration_number',
+				'registrationNumber',
+			]
+		);
+
+		return strtoupper(trim((string) ($value ?? '')));
+	}
+}
+
+if (!function_exists('vehicle_sync_get_row_value_by_alias')) {
+	function vehicle_sync_get_row_value_by_alias(array $row, array $candidateKeys): mixed
+	{
+		$index = [];
+		foreach ($row as $key => $value) {
+			if (!is_string($key)) {
+				continue;
+			}
+
+			$index[vehicle_sync_normalize_alias_key($key)] = $value;
+		}
+
+		foreach ($candidateKeys as $candidateKey) {
+			$normalizedCandidate = vehicle_sync_normalize_alias_key((string) $candidateKey);
+			if (array_key_exists($normalizedCandidate, $index)) {
+				return $index[$normalizedCandidate];
+			}
+		}
+
+		return null;
+	}
+}
+
+if (!function_exists('vehicle_sync_normalize_alias_key')) {
+	function vehicle_sync_normalize_alias_key(string $key): string
+	{
+		$normalized = preg_replace('/[^a-z0-9]+/i', '_', $key);
+		$normalized = strtolower(trim((string) $normalized, '_'));
+
+		return $normalized;
 	}
 }
 
@@ -384,6 +489,47 @@ if (!function_exists('vehicle_sync_resolve_rows')) {
 			'delete_from_db' => 0,
 		];
 
+		$managedJsonTypes = [];
+		foreach ($fileMtimeByType as $vehicleType => $fileMtime) {
+			if ((int) $fileMtime > 0) {
+				$managedJsonTypes[(string) $vehicleType] = true;
+			}
+		}
+
+		// JSON-first mode: any plate present in a managed JSON file is authoritative for that type.
+		if ($preferJson && !$preferDbTimestamps && !empty($managedJsonTypes)) {
+			$resolvedRowsByPlate = [];
+
+			foreach ($dbRowsByPlate as $licensePlate => $dbRow) {
+				$dbVehicleType = vehicle_sync_pick_enum($dbRow['vehicle_type'] ?? 'cars', ['cars', 'bikes', 'luxury'], 'cars');
+				if (!isset($managedJsonTypes[$dbVehicleType])) {
+					$resolvedRowsByPlate[$licensePlate] = $dbRow;
+					$stats['upsert_from_db']++;
+				}
+			}
+
+			foreach ($jsonRowsByPlate as $licensePlate => $jsonRow) {
+				$resolvedRowsByPlate[$licensePlate] = $jsonRow;
+				$stats['upsert_from_json']++;
+			}
+
+			foreach ($dbRowsByPlate as $licensePlate => $dbRow) {
+				$dbVehicleType = vehicle_sync_pick_enum($dbRow['vehicle_type'] ?? 'cars', ['cars', 'bikes', 'luxury'], 'cars');
+				if (!isset($managedJsonTypes[$dbVehicleType])) {
+					continue;
+				}
+
+				if (!isset($jsonRowsByPlate[$licensePlate])) {
+					$stats['delete_from_json']++;
+				}
+			}
+
+			return [
+				'rows_by_plate' => $resolvedRowsByPlate,
+				'stats' => $stats,
+			];
+		}
+
 		$lastSyncedAtTs = vehicle_sync_to_timestamp($state['last_synced_at'] ?? null);
 		if ($lastSyncedAtTs <= 0) {
 			$lastSyncedAtTs = time();
@@ -398,6 +544,12 @@ if (!function_exists('vehicle_sync_resolve_rows')) {
 			$dbRow = $dbRowsByPlate[$licensePlate] ?? null;
 			$jsonRow = $jsonRowsByPlate[$licensePlate] ?? null;
 			$statePlate = $state['plates'][$licensePlate] ?? null;
+			$stateVehicleType = vehicle_sync_pick_enum(
+				is_array($statePlate) ? ($statePlate['vehicle_type'] ?? 'cars') : 'cars',
+				['cars', 'bikes', 'luxury'],
+				'cars'
+			);
+			$jsonFileExistsForStateType = (int) ($fileMtimeByType[$stateVehicleType] ?? 0) > 0;
 
 			$events = [];
 
@@ -426,7 +578,7 @@ if (!function_exists('vehicle_sync_resolve_rows')) {
 				];
 			}
 
-			if (is_array($statePlate) && !empty($statePlate['json_present']) && $jsonRow === null) {
+			if (is_array($statePlate) && !empty($statePlate['json_present']) && $jsonRow === null && $jsonFileExistsForStateType) {
 				$events[] = [
 					'kind' => 'delete',
 					'source' => 'json',
@@ -596,8 +748,9 @@ if (!function_exists('vehicle_sync_json_deletion_timestamp')) {
 if (!function_exists('vehicle_sync_apply_resolved_rows_to_db')) {
 	function vehicle_sync_apply_resolved_rows_to_db(PDO $pdo, array $resolvedRowsByPlate, array $dbRowsByPlate, array $categoryIdByType): array
 	{
-		$upsertSql = "
+		$insertSql = "
 			INSERT INTO vehicles (
+				id,
 				category_id,
 				vehicle_type,
 				short_name,
@@ -616,6 +769,7 @@ if (!function_exists('vehicle_sync_apply_resolved_rows_to_db')) {
 				created_at,
 				updated_at
 			) VALUES (
+				:id,
 				:category_id,
 				:vehicle_type,
 				:short_name,
@@ -634,83 +788,111 @@ if (!function_exists('vehicle_sync_apply_resolved_rows_to_db')) {
 				:created_at,
 				:updated_at
 			)
-			ON DUPLICATE KEY UPDATE
-				category_id = VALUES(category_id),
-				vehicle_type = VALUES(vehicle_type),
-				short_name = VALUES(short_name),
-				full_name = VALUES(full_name),
-				price_per_day = VALUES(price_per_day),
-				driver_age_requirement = VALUES(driver_age_requirement),
-				image_path = VALUES(image_path),
-				number_of_seats = VALUES(number_of_seats),
-				transmission_type = VALUES(transmission_type),
-				fuel_type = VALUES(fuel_type),
-				status = VALUES(status),
-				gps_id = VALUES(gps_id),
-				last_service_date = VALUES(last_service_date),
-				description = VALUES(description),
-				updated_at = VALUES(updated_at)
 		";
 
-		$upsertStmt = $pdo->prepare($upsertSql);
+		$updateSql = "
+			UPDATE vehicles
+			SET
+				category_id = :category_id,
+				vehicle_type = :vehicle_type,
+				short_name = :short_name,
+				full_name = :full_name,
+				price_per_day = :price_per_day,
+				driver_age_requirement = :driver_age_requirement,
+				image_path = :image_path,
+				number_of_seats = :number_of_seats,
+				transmission_type = :transmission_type,
+				fuel_type = :fuel_type,
+				status = :status,
+				gps_id = :gps_id,
+				last_service_date = :last_service_date,
+				description = :description,
+				updated_at = :updated_at
+			WHERE id = :id
+		";
+
+		$insertStmt = $pdo->prepare($insertSql);
+		$updateStmt = $pdo->prepare($updateSql);
 		$deleteStmt = $pdo->prepare('DELETE FROM vehicles WHERE license_plate = :license_plate');
 
 		$upsertedCount = 0;
 		$deletedCount = 0;
 		$now = date('Y-m-d H:i:s');
 
+		$usedVehicleIds = [];
+		foreach ($dbRowsByPlate as $existingRow) {
+			$existingId = (int) ($existingRow['id'] ?? 0);
+			if ($existingId > 0) {
+				$usedVehicleIds[$existingId] = true;
+			}
+		}
+
+		$nextSequentialVehicleId = count($dbRowsByPlate) + 1;
+		while (isset($usedVehicleIds[$nextSequentialVehicleId])) {
+			$nextSequentialVehicleId++;
+		}
+
+		$allocateSequentialVehicleId = static function () use (&$usedVehicleIds, &$nextSequentialVehicleId): int {
+			while (isset($usedVehicleIds[$nextSequentialVehicleId])) {
+				$nextSequentialVehicleId++;
+			}
+
+			$allocatedId = $nextSequentialVehicleId;
+			$usedVehicleIds[$allocatedId] = true;
+			$nextSequentialVehicleId++;
+
+			return $allocatedId;
+		};
+
 		$pdo->beginTransaction();
 		try {
 			foreach ($resolvedRowsByPlate as $licensePlate => $resolvedRow) {
 				$dbRow = $dbRowsByPlate[$licensePlate] ?? null;
-				$vehicleType = vehicle_sync_pick_enum(
-					$resolvedRow['vehicle_type'] ?? ($dbRow['vehicle_type'] ?? 'cars'),
-					['cars', 'bikes', 'luxury'],
-					'cars'
+				$persistentRow = vehicle_sync_build_vehicle_persistable_row(
+					$resolvedRow,
+					is_array($dbRow) ? $dbRow : null,
+					$categoryIdByType,
+					$licensePlate
 				);
 
-				$categoryId = $categoryIdByType[$vehicleType] ?? ($categoryIdByType['cars'] ?? 1);
-				$fullName = vehicle_sync_pick_text($resolvedRow['full_name'] ?? ($dbRow['full_name'] ?? ''), 'Unknown Vehicle');
-				$shortName = vehicle_sync_pick_text($resolvedRow['short_name'] ?? ($dbRow['short_name'] ?? ''), $fullName);
+				if (!is_array($dbRow)) {
+					$insertStmt->execute(array_merge(
+						[
+							'id' => $allocateSequentialVehicleId(),
+						],
+						$persistentRow,
+						[
+							'created_at' => $now,
+							'updated_at' => $now,
+						]
+					));
+					$upsertedCount++;
+					continue;
+				}
 
-				$upsertStmt->execute([
-					'category_id' => $categoryId,
-					'vehicle_type' => $vehicleType,
-					'short_name' => $shortName,
-					'full_name' => $fullName,
-					'price_per_day' => vehicle_sync_pick_int($resolvedRow['price_per_day'] ?? ($dbRow['price_per_day'] ?? 0), 0),
-					'driver_age_requirement' => vehicle_sync_pick_int($resolvedRow['driver_age_requirement'] ?? ($dbRow['driver_age_requirement'] ?? 18), 18),
-					'image_path' => vehicle_sync_pick_nullable_text($resolvedRow['image_path'] ?? ($dbRow['image_path'] ?? null)),
-					'number_of_seats' => vehicle_sync_pick_nullable_int($resolvedRow['number_of_seats'] ?? ($dbRow['number_of_seats'] ?? null)),
-					'transmission_type' => vehicle_sync_pick_enum(
-						$resolvedRow['transmission_type'] ?? ($dbRow['transmission_type'] ?? 'manual'),
-						['manual', 'automatic', 'hybrid', 'n/a'],
-						'manual'
-					),
-					'fuel_type' => vehicle_sync_pick_enum(
-						$resolvedRow['fuel_type'] ?? ($dbRow['fuel_type'] ?? 'petrol'),
-						['petrol', 'diesel', 'electric'],
-						'petrol'
-					),
-					'license_plate' => $licensePlate,
-					'status' => vehicle_sync_pick_enum(
-						$resolvedRow['status'] ?? ($dbRow['status'] ?? 'available'),
-						['available', 'reserved', 'on_trip', 'overdue', 'maintenance'],
-						'available'
-					),
-					'gps_id' => vehicle_sync_pick_nullable_text($resolvedRow['gps_id'] ?? ($dbRow['gps_id'] ?? null)),
-					'last_service_date' => vehicle_sync_normalize_date($resolvedRow['last_service_date'] ?? ($dbRow['last_service_date'] ?? null)),
-					'description' => vehicle_sync_pick_nullable_text($resolvedRow['description'] ?? ($dbRow['description'] ?? null)),
-					'created_at' => vehicle_sync_normalize_datetime(
-						$resolvedRow['created_at'] ?? ($dbRow['created_at'] ?? $now),
-						$dbRow['created_at'] ?? $now
-					),
-					'updated_at' => vehicle_sync_normalize_datetime(
-						$resolvedRow['updated_at'] ?? ($dbRow['updated_at'] ?? $now),
-						$now
-					),
-				]);
+				$existingRow = vehicle_sync_build_vehicle_persistable_row(
+					$dbRow,
+					$dbRow,
+					$categoryIdByType,
+					$licensePlate
+				);
 
+				if (vehicle_sync_vehicle_rows_match($persistentRow, $existingRow)) {
+					continue;
+				}
+
+				$updatePayload = $persistentRow;
+				unset($updatePayload['license_plate']);
+
+				$updateStmt->execute(array_merge(
+					[
+						'id' => (int) ($dbRow['id'] ?? 0),
+					],
+					$updatePayload,
+					[
+						'updated_at' => $now,
+					]
+				));
 				$upsertedCount++;
 			}
 
@@ -738,6 +920,82 @@ if (!function_exists('vehicle_sync_apply_resolved_rows_to_db')) {
 			'upserted' => $upsertedCount,
 			'deleted' => $deletedCount,
 		];
+	}
+}
+
+if (!function_exists('vehicle_sync_build_vehicle_persistable_row')) {
+	function vehicle_sync_build_vehicle_persistable_row(array $sourceRow, ?array $dbRow, array $categoryIdByType, string $licensePlate): array
+	{
+		$vehicleType = vehicle_sync_pick_enum(
+			$sourceRow['vehicle_type'] ?? ($dbRow['vehicle_type'] ?? 'cars'),
+			['cars', 'bikes', 'luxury'],
+			'cars'
+		);
+
+		$categoryId = $categoryIdByType[$vehicleType] ?? ($categoryIdByType['cars'] ?? 1);
+		$fullName = vehicle_sync_pick_text($sourceRow['full_name'] ?? ($dbRow['full_name'] ?? ''), 'Unknown Vehicle');
+		$shortName = vehicle_sync_pick_text($sourceRow['short_name'] ?? ($dbRow['short_name'] ?? ''), $fullName);
+
+		return [
+			'category_id' => $categoryId,
+			'vehicle_type' => $vehicleType,
+			'short_name' => $shortName,
+			'full_name' => $fullName,
+			'price_per_day' => vehicle_sync_pick_int($sourceRow['price_per_day'] ?? ($dbRow['price_per_day'] ?? 0), 0),
+			'driver_age_requirement' => vehicle_sync_pick_int($sourceRow['driver_age_requirement'] ?? ($dbRow['driver_age_requirement'] ?? 18), 18),
+			'image_path' => vehicle_sync_pick_nullable_text($sourceRow['image_path'] ?? ($dbRow['image_path'] ?? null)),
+			'number_of_seats' => vehicle_sync_pick_nullable_int($sourceRow['number_of_seats'] ?? ($dbRow['number_of_seats'] ?? null)),
+			'transmission_type' => vehicle_sync_pick_enum(
+				$sourceRow['transmission_type'] ?? ($dbRow['transmission_type'] ?? 'manual'),
+				['manual', 'automatic', 'hybrid', 'n/a'],
+				'manual'
+			),
+			'fuel_type' => vehicle_sync_pick_enum(
+				$sourceRow['fuel_type'] ?? ($dbRow['fuel_type'] ?? 'petrol'),
+				['petrol', 'diesel', 'electric'],
+				'petrol'
+			),
+			'license_plate' => strtoupper(trim((string) $licensePlate)),
+			'status' => vehicle_sync_pick_enum(
+				$sourceRow['status'] ?? ($dbRow['status'] ?? 'available'),
+				['available', 'reserved', 'on_trip', 'overdue', 'maintenance'],
+				'available'
+			),
+			'gps_id' => vehicle_sync_pick_nullable_text($sourceRow['gps_id'] ?? ($dbRow['gps_id'] ?? null)),
+			'last_service_date' => vehicle_sync_normalize_date($sourceRow['last_service_date'] ?? ($dbRow['last_service_date'] ?? null)),
+			'description' => vehicle_sync_pick_nullable_text($sourceRow['description'] ?? ($dbRow['description'] ?? null)),
+		];
+	}
+}
+
+if (!function_exists('vehicle_sync_vehicle_rows_match')) {
+	function vehicle_sync_vehicle_rows_match(array $leftRow, array $rightRow): bool
+	{
+		$keys = [
+			'category_id',
+			'vehicle_type',
+			'short_name',
+			'full_name',
+			'price_per_day',
+			'driver_age_requirement',
+			'image_path',
+			'number_of_seats',
+			'transmission_type',
+			'fuel_type',
+			'license_plate',
+			'status',
+			'gps_id',
+			'last_service_date',
+			'description',
+		];
+
+		foreach ($keys as $key) {
+			if (($leftRow[$key] ?? null) !== ($rightRow[$key] ?? null)) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 }
 

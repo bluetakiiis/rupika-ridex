@@ -24,10 +24,79 @@ $isAdminLogoutPost =
 	$_SERVER['REQUEST_METHOD'] === 'POST'
 	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'admin-logout';
 
+$isAdminDeleteVehiclePost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'admin-delete-vehicle';
+
 if ($isAdminLogoutPost) {
 	unset($_SESSION['auth_user'], $_SESSION['admin_login_flash']);
 	session_regenerate_id(true);
 	header('Location: index.php', true, 303);
+	exit;
+}
+
+// admin fleet delete: process delete requests from the Manage Fleet confirmation modal
+// and persist the deletion directly in DB, then return to the same fleet filter context.
+if ($isAdminDeleteVehiclePost) {
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');
+
+	if (!$isAdminSession) {
+		header('Location: index.php', true, 302);
+		exit;
+	}
+
+	$deleteAllowedModes = ['type', 'status'];
+	$deleteAllowedTypes = ['cars', 'bikes', 'luxury'];
+	$deleteAllowedStatuses = ['reserved', 'on_trip', 'overdue', 'maintenance'];
+
+	$deleteFleetMode = strtolower(trim((string) ($_POST['fleet_mode'] ?? 'type')));
+	if (!in_array($deleteFleetMode, $deleteAllowedModes, true)) {
+		$deleteFleetMode = 'type';
+	}
+
+	$deleteFleetType = strtolower(trim((string) ($_POST['fleet_type'] ?? 'cars')));
+	if (!in_array($deleteFleetType, $deleteAllowedTypes, true)) {
+		$deleteFleetType = 'cars';
+	}
+
+	$deleteFleetStatus = strtolower(trim((string) ($_POST['fleet_status'] ?? 'reserved')));
+	if (!in_array($deleteFleetStatus, $deleteAllowedStatuses, true)) {
+		$deleteFleetStatus = 'reserved';
+	}
+
+	$deleteVehicleId = (int) ($_POST['vehicle_id'] ?? 0);
+
+	$deleteRedirectQuery = [
+		'page' => 'admin-manage-fleet',
+		'fleet_mode' => $deleteFleetMode,
+	];
+	if ($deleteFleetMode === 'status') {
+		$deleteRedirectQuery['fleet_status'] = $deleteFleetStatus;
+	} else {
+		$deleteRedirectQuery['fleet_type'] = $deleteFleetType;
+	}
+	$deleteRedirectUrl = 'index.php?' . http_build_query($deleteRedirectQuery);
+
+	if ($deleteVehicleId > 0) {
+		try {
+			$pdo = db();
+			$deleteVehicleStmt = $pdo->prepare('DELETE FROM vehicles WHERE id = :id LIMIT 1');
+			$deleteVehicleStmt->execute([
+				'id' => $deleteVehicleId,
+			]);
+
+			// Keep JSON cache aligned with DB delete so JSON-first read sync does not restore removed rows.
+			sync_vehicles_json_bidirectional($pdo, APP_ROOT . '/var/cache/vehicles-json', [
+				'prefer_json' => false,
+				'prefer_db_timestamps' => true,
+			]);
+		} catch (Throwable $exception) {
+			error_log('Admin vehicle delete failed: ' . $exception->getMessage());
+		}
+	}
+
+	header('Location: ' . $deleteRedirectUrl, true, 303);
 	exit;
 }
 
@@ -61,36 +130,82 @@ if (!$isAdminLoginPost && isset($_SESSION['admin_login_flash']) && is_array($_SE
 
 // admin login: ensure the default admin credential exists with hashed password
 $ensureDefaultAdminAccount = static function (PDO $pdo): void {
-	$defaultAdminEmail = 'rupikadangole@gmail.com';
+	$defaultAdminEmail = 'rupikadangol@gmail.com';
 	$defaultAdminPassword = '12345678';
+	$defaultAdminHash = password_hash($defaultAdminPassword, PASSWORD_DEFAULT);
 
-	$existingAdminStmt = $pdo->prepare('SELECT id, role FROM users WHERE email = :email LIMIT 1');
-	$existingAdminStmt->execute(['email' => $defaultAdminEmail]);
-	$existingAdmin = $existingAdminStmt->fetch();
+	$canonicalUserStmt = $pdo->prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
+	$canonicalUserStmt->execute(['email' => $defaultAdminEmail]);
+	$canonicalUserId = (int) $canonicalUserStmt->fetchColumn();
 
-	if (is_array($existingAdmin)) {
-		if (($existingAdmin['role'] ?? '') !== 'admin') {
-			$upgradeRoleStmt = $pdo->prepare('UPDATE users SET role = :role, updated_at = CURRENT_TIMESTAMP WHERE id = :id');
-			$upgradeRoleStmt->execute([
+	if ($canonicalUserId <= 0) {
+		$existingAdminStmt = $pdo->prepare('SELECT id FROM users WHERE role = :role ORDER BY id ASC LIMIT 1');
+		$existingAdminStmt->execute(['role' => 'admin']);
+		$existingAdminId = (int) $existingAdminStmt->fetchColumn();
+
+		if ($existingAdminId > 0) {
+			$reuseAdminStmt = $pdo->prepare(
+				'UPDATE users
+				 SET name = :name,
+					 email = :email,
+					 password_hash = :password_hash,
+					 role = :role,
+					 updated_at = CURRENT_TIMESTAMP
+				 WHERE id = :id'
+			);
+			$reuseAdminStmt->execute([
+				'name' => 'Ridex Admin',
+				'email' => $defaultAdminEmail,
+				'password_hash' => $defaultAdminHash,
 				'role' => 'admin',
-				'id' => (int) ($existingAdmin['id'] ?? 0),
+				'id' => $existingAdminId,
 			]);
+			$canonicalUserId = $existingAdminId;
+		} else {
+			$insertAdminStmt = $pdo->prepare(
+				'INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
+				 VALUES (:name, :email, :password_hash, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
+			);
+			$insertAdminStmt->execute([
+				'name' => 'Ridex Admin',
+				'email' => $defaultAdminEmail,
+				'password_hash' => $defaultAdminHash,
+				'role' => 'admin',
+			]);
+			$canonicalUserId = (int) $pdo->lastInsertId();
 		}
-
-		return;
 	}
 
-	$insertAdminStmt = $pdo->prepare(
-		'INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
-		 VALUES (:name, :email, :password_hash, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
-	);
+	if ($canonicalUserId > 0) {
+		$normalizeCanonicalStmt = $pdo->prepare(
+			'UPDATE users
+			 SET name = :name,
+				 email = :email,
+				 password_hash = :password_hash,
+				 role = :role,
+				 updated_at = CURRENT_TIMESTAMP
+			 WHERE id = :id'
+		);
+		$normalizeCanonicalStmt->execute([
+			'name' => 'Ridex Admin',
+			'email' => $defaultAdminEmail,
+			'password_hash' => $defaultAdminHash,
+			'role' => 'admin',
+			'id' => $canonicalUserId,
+		]);
 
-	$insertAdminStmt->execute([
-		'name' => 'Ridex Admin',
-		'email' => $defaultAdminEmail,
-		'password_hash' => password_hash($defaultAdminPassword, PASSWORD_DEFAULT),
-		'role' => 'admin',
-	]);
+		$demoteOtherAdminsStmt = $pdo->prepare(
+			'UPDATE users
+			 SET role = :user_role,
+				 updated_at = CURRENT_TIMESTAMP
+			 WHERE role = :admin_role AND id <> :id'
+		);
+		$demoteOtherAdminsStmt->execute([
+			'user_role' => 'user',
+			'admin_role' => 'admin',
+			'id' => $canonicalUserId,
+		]);
+	}
 };
 
 // admin login: always ensure the default admin account exists in users(role=admin).
@@ -140,7 +255,7 @@ if ($isAdminLoginPost) {
 			$adminLookupStmt = $pdo->prepare(
 				'SELECT id, name, email, phone, password_hash, role
 				 FROM users
-				 WHERE email = :email AND role = :role
+				 WHERE LOWER(email) = LOWER(:email) AND role = :role
 				 LIMIT 1'
 			);
 			$adminLookupStmt->execute([
@@ -192,9 +307,18 @@ if ($isAdminLoginPost) {
 	}
 }
 
-$runVehicleSync = static function (): void {
+$runVehicleSync = static function (bool $preferDbTimestamps = false): void {
 	try {
-		sync_vehicles_json_bidirectional(db(), APP_ROOT . '/var/cache/vehicles-json');
+		$syncOptions = $preferDbTimestamps
+			? [
+				'prefer_json' => false,
+				'prefer_db_timestamps' => true,
+			]
+			: [
+				'prefer_json' => true,
+			];
+
+		sync_vehicles_json_bidirectional(db(), APP_ROOT . '/var/cache/vehicles-json', $syncOptions);
 	} catch (Throwable $exception) {
 		// Keep page rendering available even if JSON sync fails.
 		error_log('Vehicle JSON sync failed: ' . $exception->getMessage());
@@ -202,9 +326,11 @@ $runVehicleSync = static function (): void {
 };
 
 // Pull latest changes before read queries.
-$runVehicleSync();
+$runVehicleSync(false);
 // Push website-originated DB changes (create/update/delete) after request handling.
-register_shutdown_function($runVehicleSync);
+register_shutdown_function(static function () use ($runVehicleSync): void {
+	$runVehicleSync(true);
+});
 
 $allowedVehicleTypes = ['cars', 'bikes', 'luxury'];
 

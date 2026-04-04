@@ -25,6 +25,12 @@
 	const navigationLinks = Array.from(document.querySelectorAll(".menu-modal__link[href]"));
 	const passwordToggleButtons = Array.from(document.querySelectorAll("[data-password-toggle]"));
 	const adminLoginModal = document.getElementById("admin-login-modal");
+	const adminDeleteVehicleModal = document.getElementById("admin-delete-vehicle-modal");
+	const adminDeleteVehicleIdInput = adminDeleteVehicleModal?.querySelector("[data-delete-vehicle-id-input]");
+	const adminDeleteVehicleNameNode = adminDeleteVehicleModal?.querySelector("[data-delete-vehicle-name]");
+	const adminDeleteFleetModeInput = adminDeleteVehicleModal?.querySelector("[data-delete-fleet-mode-input]");
+	const adminDeleteFleetTypeInput = adminDeleteVehicleModal?.querySelector("[data-delete-fleet-type-input]");
+	const adminDeleteFleetStatusInput = adminDeleteVehicleModal?.querySelector("[data-delete-fleet-status-input]");
 	const adminLoginForm = adminLoginModal?.querySelector("[data-admin-login-form]");
 	const adminLoginInputs = adminLoginModal
 		? Array.from(adminLoginModal.querySelectorAll("[data-admin-login-input]"))
@@ -63,6 +69,47 @@
 			if (icon) {
 				icon.textContent = "visibility";
 			}
+		}
+	};
+
+	// admin fleet delete: populate delete modal fields with the selected vehicle and active fleet filters.
+	const hydrateDeleteVehicleModal = (triggerButton) => {
+		if (!(triggerButton instanceof HTMLElement)) {
+			return;
+		}
+
+		const vehicleId = Number.parseInt(
+			triggerButton.getAttribute("data-delete-vehicle-id") || "0",
+			10
+		);
+		const vehicleName =
+			triggerButton.getAttribute("data-delete-vehicle-label") ||
+			triggerButton.getAttribute("data-delete-vehicle-name") ||
+			"this vehicle";
+		const fleetMode = triggerButton.getAttribute("data-delete-fleet-mode") || "type";
+		const fleetType = triggerButton.getAttribute("data-delete-fleet-type") || "cars";
+		const fleetStatus =
+			triggerButton.getAttribute("data-delete-fleet-status") || "reserved";
+
+		if (adminDeleteVehicleIdInput instanceof HTMLInputElement) {
+			adminDeleteVehicleIdInput.value =
+				Number.isFinite(vehicleId) && vehicleId > 0 ? String(vehicleId) : "";
+		}
+
+		if (adminDeleteVehicleNameNode instanceof HTMLElement) {
+			adminDeleteVehicleNameNode.textContent = vehicleName;
+		}
+
+		if (adminDeleteFleetModeInput instanceof HTMLInputElement) {
+			adminDeleteFleetModeInput.value = fleetMode;
+		}
+
+		if (adminDeleteFleetTypeInput instanceof HTMLInputElement) {
+			adminDeleteFleetTypeInput.value = fleetType;
+		}
+
+		if (adminDeleteFleetStatusInput instanceof HTMLInputElement) {
+			adminDeleteFleetStatusInput.value = fleetStatus;
 		}
 	};
 
@@ -168,6 +215,10 @@
 			const targetId = button.getAttribute("data-modal-target");
 			if (!targetId) {
 				return;
+			}
+
+			if (targetId === "admin-delete-vehicle-modal") {
+				hydrateDeleteVehicleModal(button);
 			}
 
 			if (modalHistory.length === 0) {

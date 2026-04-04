@@ -35,39 +35,64 @@ try {
 	}
 
 	// admin login: ensure the requested default admin credential exists as a hashed password record
-	$defaultAdminEmail = 'rupikadangole@gmail.com';
+	$defaultAdminEmail = 'rupikadangol@gmail.com';
 	$defaultAdminPassword = '12345678';
 	$defaultAdminHash = password_hash($defaultAdminPassword, PASSWORD_DEFAULT);
 
-	$existingAdminStmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
-	$existingAdminStmt->execute(['email' => $defaultAdminEmail]);
-	$existingAdminId = (int) $existingAdminStmt->fetchColumn();
+	$canonicalUserStmt = $pdo->prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
+	$canonicalUserStmt->execute(['email' => $defaultAdminEmail]);
+	$canonicalUserId = (int) $canonicalUserStmt->fetchColumn();
 
-	if ($existingAdminId > 0) {
-		$updateAdminStmt = $pdo->prepare(
+	if ($canonicalUserId <= 0) {
+		$existingAdminStmt = $pdo->prepare('SELECT id FROM users WHERE role = :role ORDER BY id ASC LIMIT 1');
+		$existingAdminStmt->execute(['role' => 'admin']);
+		$existingAdminId = (int) $existingAdminStmt->fetchColumn();
+
+		if ($existingAdminId > 0) {
+			$canonicalUserId = $existingAdminId;
+		} else {
+			$insertAdminStmt = $pdo->prepare(
+				'INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
+				 VALUES (:name, :email, :password_hash, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
+			);
+			$insertAdminStmt->execute([
+				'name' => 'Ridex Admin',
+				'email' => $defaultAdminEmail,
+				'password_hash' => $defaultAdminHash,
+				'role' => 'admin',
+			]);
+			$canonicalUserId = (int) $pdo->lastInsertId();
+		}
+	}
+
+	if ($canonicalUserId > 0) {
+		$updateCanonicalAdminStmt = $pdo->prepare(
 			'UPDATE users
 			 SET role = :role,
 				 name = :name,
+				 email = :email,
 				 password_hash = :password_hash,
 				 updated_at = CURRENT_TIMESTAMP
 			 WHERE id = :id'
 		);
-		$updateAdminStmt->execute([
+		$updateCanonicalAdminStmt->execute([
 			'role' => 'admin',
-			'name' => 'Ridex Admin',
-			'password_hash' => $defaultAdminHash,
-			'id' => $existingAdminId,
-		]);
-	} else {
-		$insertAdminStmt = $pdo->prepare(
-			'INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
-			 VALUES (:name, :email, :password_hash, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
-		);
-		$insertAdminStmt->execute([
 			'name' => 'Ridex Admin',
 			'email' => $defaultAdminEmail,
 			'password_hash' => $defaultAdminHash,
-			'role' => 'admin',
+			'id' => $canonicalUserId,
+		]);
+
+		$demoteOtherAdminsStmt = $pdo->prepare(
+			'UPDATE users
+			 SET role = :user_role,
+				 updated_at = CURRENT_TIMESTAMP
+			 WHERE role = :admin_role AND id <> :id'
+		);
+		$demoteOtherAdminsStmt->execute([
+			'user_role' => 'user',
+			'admin_role' => 'admin',
+			'id' => $canonicalUserId,
 		]);
 	}
 

@@ -10,7 +10,7 @@ try {
 	$args = array_slice($_SERVER['argv'] ?? [], 1);
 	if (in_array('--help', $args, true) || in_array('-h', $args, true)) {
 		echo "Usage: php bin/sync_vehicles_json.php [--prefer-json|--force-json|--prefer-db-timestamps|--prefer-db]" . PHP_EOL;
-		echo "Default mode uses latest-update-wins across JSON and DB." . PHP_EOL;
+		echo "Default mode is JSON-first (JSON add/edit/delete is applied to DB)." . PHP_EOL;
 		echo "  --prefer-json          Force JSON as conflict winner." . PHP_EOL;
 		echo "  --force-json   Alias for --prefer-json." . PHP_EOL;
 		echo "  --prefer-db-timestamps Force DB as conflict winner (legacy behavior)." . PHP_EOL;
@@ -24,11 +24,14 @@ try {
 		throw new InvalidArgumentException('Use either --prefer-json or --prefer-db-timestamps, not both.');
 	}
 
-	$options = [];
+	$options = [
+		'prefer_json' => true,
+	];
 	if ($preferJsonFlag) {
 		$options['prefer_json'] = true;
 	}
 	if ($preferDbTimestamps) {
+		$options['prefer_json'] = false;
 		$options['prefer_db_timestamps'] = true;
 	}
 

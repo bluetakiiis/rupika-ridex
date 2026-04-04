@@ -132,10 +132,23 @@ if ($fleetMode === 'status') {
 
 						<h2 class="admin-fleet-card__name"><?= htmlspecialchars($vehicleName, ENT_QUOTES, 'UTF-8') ?></h2>
 
+						<?php // manage fleet delete: opens delete confirmation modal with selected vehicle context. ?>
 						<div class="admin-fleet-card__actions<?= $fleetMode === 'status' ? ' admin-fleet-card__actions--single' : '' ?>">
 							<a class="admin-fleet-card__btn admin-fleet-card__btn--edit" href="index.php?page=admin-manage-fleet">Edit</a>
 							<?php if ($fleetMode !== 'status'): ?>
-								<button class="admin-fleet-card__btn admin-fleet-card__btn--delete" type="button">Delete</button>
+								<button
+									class="admin-fleet-card__btn admin-fleet-card__btn--delete"
+									type="button"
+									data-modal-target="admin-delete-vehicle-modal"
+									data-delete-vehicle-trigger
+									data-delete-vehicle-id="<?= (int) ($vehicle['id'] ?? 0) ?>"
+									data-delete-vehicle-label="<?= htmlspecialchars($vehicleName, ENT_QUOTES, 'UTF-8') ?>"
+									data-delete-fleet-mode="<?= htmlspecialchars($fleetMode, ENT_QUOTES, 'UTF-8') ?>"
+									data-delete-fleet-type="<?= htmlspecialchars($selectedFleetType, ENT_QUOTES, 'UTF-8') ?>"
+									data-delete-fleet-status="<?= htmlspecialchars($selectedFleetStatus, ENT_QUOTES, 'UTF-8') ?>"
+								>
+									Delete
+								</button>
 							<?php endif; ?>
 						</div>
 					</article>
