@@ -18,7 +18,7 @@ INSERT INTO `categories` (`id`, `name`, `description`) VALUES
 
 -- Table: users
 INSERT INTO `users` (`id`, `name`, `first_name`, `last_name`, `email`, `password_hash`, `phone`, `address`, `date_of_birth`, `street`, `post_code`, `city`, `province`, `role`, `drivers_id`, `created_at`, `updated_at`) VALUES
-  (1, 'Ridex Admin', NULL, NULL, 'rupikadangol@gmail.com', '$2y$10$wO4.W6mydXcmHl4pv03Dsu6vXKRyhRITGsJlLkkaF6udQ2G3GVgHW', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'admin', NULL, '2026-04-04 00:13:26', '2026-04-04 15:41:31'),
+  (1, 'Ridex Admin', NULL, NULL, 'rupikadangol@gmail.com', '$2y$10$ZNSNPOjYl9yPPPs8M2QSDeKV43eHlPx2osXbgnYHJn.R2xrxQxDFW', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'admin', NULL, '2026-04-04 00:13:26', '2026-04-04 15:56:21'),
   (3, 'Ridex Admin', NULL, NULL, 'rupikadangole@gmail.com', '$2y$10$C.iqM1ZwDaatXwbf6lZRTePnoRcZw.WVjNhawiKWcLPKIdSsUOSVK', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'user', NULL, '2026-04-04 00:35:14', '2026-04-04 03:40:17');
 
 -- Table: vehicles
@@ -34,6 +34,6 @@ INSERT INTO `vehicles` (`id`, `category_id`, `vehicle_type`, `short_name`, `full
   (10, 3, 'luxury', 'On Trip', 'Mercedes-Benz SL-Class (R231)', 100, 21, 'images/luxury.png', 2, 'hybrid', 'petrol', 'BAA-2', 'on_trip', NULL, NULL, 'Mercedes-Benz SL-Class delivers premium grand touring comfort with high-performance engineering.', '2026-04-04 08:55:37', '2026-04-04 08:55:37'),
   (12, 3, 'luxury', 'Overdue', 'Mercedes-Benz SL-Class (R231)', 100, 21, 'images/luxury.png', 2, 'hybrid', 'petrol', 'BAA-3', 'overdue', NULL, NULL, 'Mercedes-Benz SL-Class delivers premium grand touring comfort with high-performance engineering.', '2026-04-04 08:56:53', '2026-04-04 08:57:25'),
   (13, 3, 'luxury', 'Maintenance', 'Mercedes-Benz SL-Class (R231)', 100, 21, 'images/luxury.png', 2, 'hybrid', 'petrol', 'BAA-4', 'maintenance', NULL, NULL, 'Mercedes-Benz SL-Class delivers premium grand touring comfort with high-performance engineering.', '2026-04-04 13:42:38', '2026-04-04 13:42:38'),
-  (3517, 2, 'bikes', 'Reserved Test Bike', 'Vespa ZX 125', 30, 18, 'images/bikes.png', 2, 'N/A', 'petrol', 'BAA-1720', 'reserved', NULL, NULL, 'Vespa ZX 125 offers practical commuting performance with classic scooter styling.', '2026-04-02 18:05:31', '2026-04-04 08:46:01');
+  (14, 2, 'bikes', 'Reserved Test Bike', 'Vespa ZX 125', 30, 18, 'images/bikes.png', 2, 'N/A', 'petrol', 'BAA-1721', 'reserved', NULL, NULL, 'Vespa ZX 125 offers practical commuting performance with classic scooter styling.', '2026-04-04 15:47:43', '2026-04-04 15:47:57');
 
 SET FOREIGN_KEY_CHECKS = 1;

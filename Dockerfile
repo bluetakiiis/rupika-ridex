@@ -11,7 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Enable Apache mod_rewrite for pretty routes.
-RUN a2enmod rewrite
+RUN a2enmod rewrite \
+    && a2dismod mpm_event \
+    && a2enmod mpm_prefork
 
 # Reconfigure Apache to use /public as the Document Root.
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
