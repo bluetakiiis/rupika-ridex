@@ -146,6 +146,51 @@ if ($adminProfilePhone === '') {
 			</button>
 		</section>
 	</div>
+
+	<?php // admin fleet delete: vehicle delete confirmation modal (same sizing/layout as logout modal). ?>
+	<div class="menu-modal admin-logout-modal" id="admin-delete-vehicle-modal" hidden aria-hidden="true" data-modal-id="admin-delete-vehicle-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog admin-logout-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="admin-delete-vehicle-title">
+			<header class="menu-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex delete vehicle confirmation">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<button class="menu-modal__close" type="button" aria-label="Close delete vehicle prompt" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
+			</header>
+
+			<div class="admin-logout-modal__content">
+				<span class="material-symbols-rounded admin-logout-modal__icon" aria-hidden="true">delete</span>
+				<p class="admin-logout-modal__text" id="admin-delete-vehicle-title">
+					Are you sure you want to delete <span data-delete-vehicle-name>this vehicle</span>? This action can’t be undone.
+				</p>
+
+				<div class="admin-logout-modal__actions">
+					<button class="admin-logout-modal__cancel" type="button" data-modal-back>Cancel</button>
+					<form class="admin-logout-modal__form" method="post" action="index.php">
+						<input type="hidden" name="action" value="admin-delete-vehicle" />
+						<input type="hidden" name="vehicle_id" value="" data-delete-vehicle-id-input />
+						<input type="hidden" name="fleet_mode" value="type" data-delete-fleet-mode-input />
+						<input type="hidden" name="fleet_type" value="cars" data-delete-fleet-type-input />
+						<input type="hidden" name="fleet_status" value="reserved" data-delete-fleet-status-input />
+						<button class="admin-logout-modal__confirm" type="submit">Delete</button>
+					</form>
+				</div>
+			</div>
+
+			<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+				<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+			</button>
+		</section>
+	</div>
 <?php endif; ?>
 
 <?php // admin login: admin authentication modal ?>
