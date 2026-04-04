@@ -83,6 +83,7 @@ Notes:
   - `luxury.json`
 - Public requests trigger sync automatically in `public/index.php` before and after page handling.
 - Keep these JSON files committed so Render deployments use the same vehicle inventory as local.
+- Legacy compatibility: when local `var/cache/vehicles-json/*.json` exists, newer files are mirrored into `data/vehicles-json/` before sync, and tracked files are mirrored back after sync.
 - In production (`APP_ENV=production`), vehicle sync defaults to DB-first so website create/edit/delete changes persist in DB and are not overwritten by stale JSON.
 - To force JSON-first behavior, set `VEHICLE_SYNC_STRATEGY=json-first`.
 - Manual/cron sync command:

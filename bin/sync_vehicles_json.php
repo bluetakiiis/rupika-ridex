@@ -6,6 +6,38 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/Helpers/vehicle_json_sync.php';
 
+$trackedJsonDir = APP_ROOT . '/data/vehicles-json';
+$legacyJsonDir = APP_ROOT . '/var/cache/vehicles-json';
+
+$mirrorVehicleJsonFiles = static function (string $sourceDir, string $targetDir): void {
+	$vehicleTypes = ['cars', 'bikes', 'luxury'];
+	if (!is_dir($sourceDir)) {
+		return;
+	}
+
+	if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+		throw new RuntimeException('Unable to create vehicle JSON mirror directory: ' . $targetDir);
+	}
+
+	foreach ($vehicleTypes as $vehicleType) {
+		$sourceFile = rtrim($sourceDir, '\\/') . DIRECTORY_SEPARATOR . $vehicleType . '.json';
+		$targetFile = rtrim($targetDir, '\\/') . DIRECTORY_SEPARATOR . $vehicleType . '.json';
+		if (!is_file($sourceFile)) {
+			continue;
+		}
+
+		$sourceMtime = (int) (@filemtime($sourceFile) ?: 0);
+		$targetMtime = is_file($targetFile) ? (int) (@filemtime($targetFile) ?: 0) : 0;
+		if ($sourceMtime <= $targetMtime) {
+			continue;
+		}
+
+		if (!@copy($sourceFile, $targetFile)) {
+			throw new RuntimeException('Unable to copy vehicle JSON from ' . $sourceFile . ' to ' . $targetFile);
+		}
+	}
+};
+
 try {
 	$args = array_slice($_SERVER['argv'] ?? [], 1);
 	if (in_array('--help', $args, true) || in_array('-h', $args, true)) {
@@ -35,11 +67,14 @@ try {
 		$options['prefer_db_timestamps'] = true;
 	}
 
+	$mirrorVehicleJsonFiles($legacyJsonDir, $trackedJsonDir);
+
 	$result = sync_vehicles_json_bidirectional(
 		db(),
-		APP_ROOT . '/data/vehicles-json',
+		$trackedJsonDir,
 		$options
 	);
+	$mirrorVehicleJsonFiles($trackedJsonDir, $legacyJsonDir);
 	echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 } catch (Throwable $exception) {
 	fwrite(STDERR, 'Vehicle JSON sync failed: ' . $exception->getMessage() . PHP_EOL);

@@ -18,7 +18,7 @@ INSERT INTO `categories` (`id`, `name`, `description`) VALUES
 
 -- Table: users
 INSERT INTO `users` (`id`, `name`, `first_name`, `last_name`, `email`, `password_hash`, `phone`, `address`, `date_of_birth`, `street`, `post_code`, `city`, `province`, `role`, `drivers_id`, `created_at`, `updated_at`) VALUES
-  (1, 'Ridex Admin', NULL, NULL, 'rupikadangol@gmail.com', '$2y$10$ALpgkn9Z.lqbIo11s4usme50fUVlhCaWAMvdekGgP6DUyhmI0fR9u', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'admin', NULL, '2026-04-04 00:13:26', '2026-04-04 14:02:30'),
+  (1, 'Ridex Admin', NULL, NULL, 'rupikadangol@gmail.com', '$2y$10$wO4.W6mydXcmHl4pv03Dsu6vXKRyhRITGsJlLkkaF6udQ2G3GVgHW', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'admin', NULL, '2026-04-04 00:13:26', '2026-04-04 15:41:31'),
   (3, 'Ridex Admin', NULL, NULL, 'rupikadangole@gmail.com', '$2y$10$C.iqM1ZwDaatXwbf6lZRTePnoRcZw.WVjNhawiKWcLPKIdSsUOSVK', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'user', NULL, '2026-04-04 00:35:14', '2026-04-04 03:40:17');
 
 -- Table: vehicles

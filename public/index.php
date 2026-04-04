@@ -19,6 +19,37 @@ if (!in_array($vehicleSyncStrategy, ['db-first', 'json-first'], true)) {
 	$vehicleSyncStrategy = $defaultVehicleSyncStrategy;
 }
 
+$legacyVehicleJsonSyncDir = APP_ROOT . '/var/cache/vehicles-json';
+$mirrorVehicleJsonFiles = static function (string $sourceDir, string $targetDir): void {
+	$vehicleTypes = ['cars', 'bikes', 'luxury'];
+	if (!is_dir($sourceDir)) {
+		return;
+	}
+
+	if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+		error_log('Vehicle JSON mirror failed: unable to create directory ' . $targetDir);
+		return;
+	}
+
+	foreach ($vehicleTypes as $vehicleType) {
+		$sourceFile = rtrim($sourceDir, '\\/') . DIRECTORY_SEPARATOR . $vehicleType . '.json';
+		$targetFile = rtrim($targetDir, '\\/') . DIRECTORY_SEPARATOR . $vehicleType . '.json';
+		if (!is_file($sourceFile)) {
+			continue;
+		}
+
+		$sourceMtime = (int) (@filemtime($sourceFile) ?: 0);
+		$targetMtime = is_file($targetFile) ? (int) (@filemtime($targetFile) ?: 0) : 0;
+		if ($sourceMtime <= $targetMtime) {
+			continue;
+		}
+
+		if (!@copy($sourceFile, $targetFile)) {
+			error_log('Vehicle JSON mirror failed while copying ' . $sourceFile . ' to ' . $targetFile);
+		}
+	}
+};
+
 // admin login: shared form state for login modal
 $adminLoginError = '';
 $adminLoginEmail = '';
@@ -90,16 +121,25 @@ if ($isAdminDeleteVehiclePost) {
 	if ($deleteVehicleId > 0) {
 		try {
 			$pdo = db();
+			$mirrorVehicleJsonFiles($legacyVehicleJsonSyncDir, $vehicleJsonSyncDir);
+
+			// Ensure sync state exists before delete so DB-side deletion is detected as an intentional remove.
+			sync_vehicles_json_bidirectional($pdo, $vehicleJsonSyncDir, [
+				'prefer_json' => false,
+				'prefer_db_timestamps' => true,
+			]);
+
 			$deleteVehicleStmt = $pdo->prepare('DELETE FROM vehicles WHERE id = :id LIMIT 1');
 			$deleteVehicleStmt->execute([
 				'id' => $deleteVehicleId,
 			]);
 
-			// Keep JSON source aligned with DB delete so JSON-first read sync does not restore removed rows.
+			// Keep JSON source aligned with DB delete so sync does not restore removed rows.
 			sync_vehicles_json_bidirectional($pdo, $vehicleJsonSyncDir, [
 				'prefer_json' => false,
 				'prefer_db_timestamps' => true,
 			]);
+			$mirrorVehicleJsonFiles($vehicleJsonSyncDir, $legacyVehicleJsonSyncDir);
 		} catch (Throwable $exception) {
 			error_log('Admin vehicle delete failed: ' . $exception->getMessage());
 		}
@@ -316,8 +356,14 @@ if ($isAdminLoginPost) {
 	}
 }
 
-$runVehicleSync = static function (bool $preferDbTimestamps = false) use ($vehicleJsonSyncDir, $vehicleSyncStrategy): void {
+$runVehicleSync = static function (bool $preferDbTimestamps = false) use (
+	$vehicleJsonSyncDir,
+	$vehicleSyncStrategy,
+	$legacyVehicleJsonSyncDir,
+	$mirrorVehicleJsonFiles
+): void {
 	try {
+		$mirrorVehicleJsonFiles($legacyVehicleJsonSyncDir, $vehicleJsonSyncDir);
 		$useDbPriority = $preferDbTimestamps || $vehicleSyncStrategy === 'db-first';
 		$syncOptions = $useDbPriority
 			? [
@@ -329,6 +375,7 @@ $runVehicleSync = static function (bool $preferDbTimestamps = false) use ($vehic
 			];
 
 		sync_vehicles_json_bidirectional(db(), $vehicleJsonSyncDir, $syncOptions);
+		$mirrorVehicleJsonFiles($vehicleJsonSyncDir, $legacyVehicleJsonSyncDir);
 	} catch (Throwable $exception) {
 		// Keep page rendering available even if JSON sync fails.
 		error_log('Vehicle JSON sync failed: ' . $exception->getMessage());
