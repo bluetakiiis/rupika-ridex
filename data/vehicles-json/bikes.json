@@ -1,0 +1,47 @@
+{
+    "category": "bikes",
+    "synced_at": "2026-04-04T15:17:32+05:45",
+    "count": 2,
+    "vehicles": [
+        {
+            "id": 3517,
+            "category_id": 2,
+            "vehicle_type": "bikes",
+            "short_name": "Reserved Test Bike",
+            "full_name": "Vespa ZX 125",
+            "price_per_day": 30,
+            "driver_age_requirement": 18,
+            "image_path": "images/bikes.png",
+            "number_of_seats": 2,
+            "transmission_type": "N/A",
+            "fuel_type": "petrol",
+            "license_plate": "BAA-1720",
+            "status": "reserved",
+            "gps_id": null,
+            "last_service_date": null,
+            "description": "Vespa ZX 125 offers practical commuting performance with classic scooter styling.",
+            "created_at": "2026-04-02 18:05:31",
+            "updated_at": "2026-04-04 08:46:01"
+        },
+        {
+            "id": 6,
+            "category_id": 2,
+            "vehicle_type": "bikes",
+            "short_name": "Vespa",
+            "full_name": "Vespa ZX 125",
+            "price_per_day": 30,
+            "driver_age_requirement": 18,
+            "image_path": "images/bikes.png",
+            "number_of_seats": 2,
+            "transmission_type": "N/A",
+            "fuel_type": "petrol",
+            "license_plate": "BAA-1723",
+            "status": "available",
+            "gps_id": null,
+            "last_service_date": null,
+            "description": "Vespa ZX 125 offers practical commuting performance with classic scooter styling.",
+            "created_at": "2026-04-02 18:05:31",
+            "updated_at": "2026-04-04 00:27:09"
+        }
+    ]
+}

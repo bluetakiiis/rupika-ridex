@@ -42,6 +42,7 @@ If you cannot pay for a separate Render DB service, deploy only the web service 
 - On container boot, it will:
   - start MariaDB locally,
   - run `php bin/migrate.php`,
+  - run `php bin/import_db_snapshot.php --if-missing-ok` (unless `APPLY_DB_SNAPSHOT_ON_BOOT=0`),
   - run `php bin/seed.php`,
   - start Apache.
 
@@ -76,11 +77,12 @@ Notes:
 
 ## Vehicle JSON Sync
 
-- Vehicles now sync bidirectionally between DB and JSON files under `var/cache/vehicles-json/`:
+- Vehicles now sync bidirectionally between DB and JSON files under `data/vehicles-json/`:
   - `cars.json`
   - `bikes.json`
   - `luxury.json`
 - Public requests trigger sync automatically in `public/index.php` before and after page handling.
+- Keep these JSON files committed so Render deployments use the same vehicle inventory as local.
 - Manual/cron sync command:
   - `php bin/sync_vehicles_json.php`
 - Default conflict rule: latest update wins across JSON and DB.
@@ -90,3 +92,17 @@ Notes:
   - Force JSON winner: `php bin/sync_vehicles_json.php --prefer-json` (or `--force-json`)
   - `php bin/sync_vehicles_json.php --prefer-db-timestamps`
   - `php bin/sync_vehicles_json.php --prefer-db` (alias)
+
+## Full Data Snapshot For Render Parity
+
+- Commit-tracked DB snapshot file: `data/deploy/db_snapshot.sql`
+- Export current DB into snapshot:
+  - `php bin/export_db_snapshot.php`
+- Import snapshot into DB:
+  - `php bin/import_db_snapshot.php`
+- To keep Render deploy data identical to your latest committed local DB, run before commit:
+  - `php bin/sync_vehicles_json.php --prefer-db-timestamps`
+  - `php bin/export_db_snapshot.php`
+- A ready pre-commit hook is provided at `.githooks/pre-commit` to automate this for every commit.
+- Enable it once per clone:
+  - `git config core.hooksPath .githooks`

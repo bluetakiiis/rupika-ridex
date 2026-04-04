@@ -68,6 +68,10 @@ SQL
 
     php /var/www/html/bin/migrate.php
 
+    if is_true "${APPLY_DB_SNAPSHOT_ON_BOOT:-1}"; then
+        php /var/www/html/bin/import_db_snapshot.php --if-missing-ok
+    fi
+
     existing_vehicle_count="$(mysql --socket=/run/mysqld/mysqld.sock -N -s "$DB_NAME" -e "SELECT COUNT(*) FROM vehicles;" 2>/dev/null || echo 0)"
     if [[ "${existing_vehicle_count:-0}" -eq 0 ]]; then
         php /var/www/html/bin/seed.php

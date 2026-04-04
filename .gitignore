@@ -13,3 +13,5 @@
 /.idea/
 *.DS_Store
 Thumbs.db
+data/vehicles-json/.vehicles-sync.lock
+data/vehicles-json/.vehicles-sync-state.json

@@ -10,6 +10,8 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 	session_start();
 }
 
+$vehicleJsonSyncDir = APP_ROOT . '/data/vehicles-json';
+
 // admin login: shared form state for login modal
 $adminLoginError = '';
 $adminLoginEmail = '';
@@ -86,8 +88,8 @@ if ($isAdminDeleteVehiclePost) {
 				'id' => $deleteVehicleId,
 			]);
 
-			// Keep JSON cache aligned with DB delete so JSON-first read sync does not restore removed rows.
-			sync_vehicles_json_bidirectional($pdo, APP_ROOT . '/var/cache/vehicles-json', [
+			// Keep JSON source aligned with DB delete so JSON-first read sync does not restore removed rows.
+			sync_vehicles_json_bidirectional($pdo, $vehicleJsonSyncDir, [
 				'prefer_json' => false,
 				'prefer_db_timestamps' => true,
 			]);
@@ -307,7 +309,7 @@ if ($isAdminLoginPost) {
 	}
 }
 
-$runVehicleSync = static function (bool $preferDbTimestamps = false): void {
+$runVehicleSync = static function (bool $preferDbTimestamps = false) use ($vehicleJsonSyncDir): void {
 	try {
 		$syncOptions = $preferDbTimestamps
 			? [
@@ -318,7 +320,7 @@ $runVehicleSync = static function (bool $preferDbTimestamps = false): void {
 				'prefer_json' => true,
 			];
 
-		sync_vehicles_json_bidirectional(db(), APP_ROOT . '/var/cache/vehicles-json', $syncOptions);
+		sync_vehicles_json_bidirectional(db(), $vehicleJsonSyncDir, $syncOptions);
 	} catch (Throwable $exception) {
 		// Keep page rendering available even if JSON sync fails.
 		error_log('Vehicle JSON sync failed: ' . $exception->getMessage());
