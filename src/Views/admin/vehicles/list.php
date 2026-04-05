@@ -11,6 +11,7 @@ $fleetMode = isset($fleetMode) ? trim((string) $fleetMode) : 'type';
 $selectedFleetType = isset($selectedFleetType) ? trim((string) $selectedFleetType) : 'cars';
 $selectedFleetStatus = isset($selectedFleetStatus) ? trim((string) $selectedFleetStatus) : 'reserved';
 $fleetVehicles = isset($fleetVehicles) && is_array($fleetVehicles) ? $fleetVehicles : [];
+$openReadVehicleId = isset($openReadVehicleId) ? (int) $openReadVehicleId : 0;
 
 $typeTabs = [
 	'cars' => 'Cars',
@@ -112,7 +113,16 @@ if ($fleetMode === 'status') {
 				<?php if ($fleetMode !== 'status'): ?>
 					<div class="admin-fleet__actions">
 						<a class="admin-fleet__pill admin-fleet__pill--outline-red" href="<?= htmlspecialchars($buildFleetUrl('status', 'reserved'), ENT_QUOTES, 'UTF-8') ?>">Unavailable</a>
-						<button class="admin-fleet__pill admin-fleet__pill--fill-green" type="button">Create</button>
+						<button
+							class="admin-fleet__pill admin-fleet__pill--fill-green"
+							type="button"
+							data-modal-target="admin-create-vehicle-modal"
+							data-create-fleet-mode="<?= htmlspecialchars($fleetMode, ENT_QUOTES, 'UTF-8') ?>"
+							data-create-fleet-type="<?= htmlspecialchars($selectedFleetType, ENT_QUOTES, 'UTF-8') ?>"
+							data-create-vehicle-type="<?= htmlspecialchars($selectedFleetType, ENT_QUOTES, 'UTF-8') ?>"
+						>
+							Create
+						</button>
 					</div>
 				<?php endif; ?>
 			</div>
@@ -128,8 +138,10 @@ if ($fleetMode === 'status') {
 					$vehicleSeats = $resolveVehicleValue($vehicle, 'number_of_seats');
 					$vehicleTransmission = $resolveVehicleValue($vehicle, 'transmission_type');
 					$vehicleFuel = $resolveVehicleValue($vehicle, 'fuel_type');
+					$vehiclePricePerDay = $resolveVehicleValue($vehicle, 'price_per_day');
 					$vehicleAgeRequirement = $resolveVehicleValue($vehicle, 'driver_age_requirement');
 					$vehiclePlate = $resolveVehicleValue($vehicle, 'license_plate');
+					$vehicleGpsId = $resolveVehicleValue($vehicle, 'gps_id');
 					$vehicleLastService = $resolveVehicleValue($vehicle, 'last_service_date');
 					$vehicleDescription = $resolveVehicleValue($vehicle, 'description');
 					$activeBookingNumber = $resolveVehicleValue($vehicle, 'active_booking_number');
@@ -144,6 +156,13 @@ if ($fleetMode === 'status') {
 					$upcomingPickupDatetime = $resolveVehicleValue($vehicle, 'upcoming_pickup_datetime');
 					$totalReservations = $resolveVehicleValue($vehicle, 'total_reservations');
 					$totalEarnings = $resolveVehicleValue($vehicle, 'total_earnings');
+					$maintenanceIssueDescription = $resolveVehicleValue($vehicle, 'maintenance_issue_description');
+					$maintenanceWorkshopName = $resolveVehicleValue($vehicle, 'maintenance_workshop_name');
+					$maintenanceEstimateCompletionDate = $resolveVehicleValue($vehicle, 'maintenance_estimate_completion_date');
+					$maintenanceServiceCost = $resolveVehicleValue($vehicle, 'maintenance_service_cost');
+					$vehicleId = (int) ($vehicle['id'] ?? 0);
+					$autoOpenReadModal = $openReadVehicleId > 0 && $openReadVehicleId === $vehicleId;
+					$isMaintenanceVehicle = $vehicleStatus === 'maintenance';
 					?>
 					<article class="admin-fleet-card">
 						<div class="admin-fleet-card__image-wrap">
@@ -152,7 +171,7 @@ if ($fleetMode === 'status') {
 								class="admin-fleet-card__image-button"
 								type="button"
 								data-modal-target="admin-vehicle-read-modal"
-								data-read-vehicle-id="<?= (int) ($vehicle['id'] ?? 0) ?>"
+								data-read-vehicle-id="<?= $vehicleId ?>"
 								data-read-vehicle-name="<?= htmlspecialchars($vehicleName, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-full-name="<?= htmlspecialchars($resolveVehicleValue($vehicle, 'full_name'), ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-type="<?= htmlspecialchars($vehicleType, ENT_QUOTES, 'UTF-8') ?>"
@@ -160,9 +179,11 @@ if ($fleetMode === 'status') {
 								data-read-vehicle-image="<?= htmlspecialchars($vehicleImage, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-seats="<?= htmlspecialchars($vehicleSeats, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-transmission="<?= htmlspecialchars($vehicleTransmission, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-price="<?= htmlspecialchars($vehiclePricePerDay, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-age="<?= htmlspecialchars($vehicleAgeRequirement, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-fuel="<?= htmlspecialchars($vehicleFuel, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-plate="<?= htmlspecialchars($vehiclePlate, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-gps-id="<?= htmlspecialchars($vehicleGpsId, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-last-service="<?= htmlspecialchars($vehicleLastService, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-description="<?= htmlspecialchars($vehicleDescription, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-booking-number="<?= htmlspecialchars($activeBookingNumber, ENT_QUOTES, 'UTF-8') ?>"
@@ -177,9 +198,14 @@ if ($fleetMode === 'status') {
 								data-read-upcoming-pickup="<?= htmlspecialchars($upcomingPickupDatetime, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-total-reservations="<?= htmlspecialchars($totalReservations, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-total-earnings="<?= htmlspecialchars($totalEarnings, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-maintenance-issue="<?= htmlspecialchars($maintenanceIssueDescription, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-maintenance-workshop="<?= htmlspecialchars($maintenanceWorkshopName, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-maintenance-estimate="<?= htmlspecialchars($maintenanceEstimateCompletionDate, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-maintenance-cost="<?= htmlspecialchars($maintenanceServiceCost, ENT_QUOTES, 'UTF-8') ?>"
 								data-delete-fleet-mode="<?= htmlspecialchars($fleetMode, ENT_QUOTES, 'UTF-8') ?>"
 								data-delete-fleet-type="<?= htmlspecialchars($selectedFleetType, ENT_QUOTES, 'UTF-8') ?>"
 								data-delete-fleet-status="<?= htmlspecialchars($selectedFleetStatus, ENT_QUOTES, 'UTF-8') ?>"
+								data-auto-open-read="<?= $autoOpenReadModal ? 'true' : 'false' ?>"
 							>
 								<img
 									src="<?= htmlspecialchars($vehicleImage, ENT_QUOTES, 'UTF-8') ?>"
@@ -194,7 +220,38 @@ if ($fleetMode === 'status') {
 
 						<?php // manage fleet delete: opens delete confirmation modal with selected vehicle context. ?>
 						<div class="admin-fleet-card__actions<?= $fleetMode === 'status' ? ' admin-fleet-card__actions--single' : '' ?>">
-							<button class="admin-fleet-card__btn admin-fleet-card__btn--edit" type="button">Edit</button>
+							<button
+								class="admin-fleet-card__btn admin-fleet-card__btn--edit"
+								type="button"
+								<?= $isMaintenanceVehicle ? 'data-modal-target="admin-maintenance-edit-modal"' : 'data-modal-target="admin-edit-vehicle-modal"' ?>
+								data-maintenance-edit-trigger
+								data-edit-vehicle-id="<?= $vehicleId ?>"
+								data-edit-vehicle-type="<?= htmlspecialchars($vehicleType, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-full-name="<?= htmlspecialchars($resolveVehicleValue($vehicle, 'full_name'), ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-short-name="<?= htmlspecialchars($vehicleName, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-price="<?= htmlspecialchars($vehiclePricePerDay, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-driver-age="<?= htmlspecialchars($vehicleAgeRequirement, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-seats="<?= htmlspecialchars($vehicleSeats, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-transmission="<?= htmlspecialchars($vehicleTransmission, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-fuel="<?= htmlspecialchars($vehicleFuel, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-license-plate="<?= htmlspecialchars($vehiclePlate, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-gps-id="<?= htmlspecialchars($vehicleGpsId, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-status="<?= htmlspecialchars($vehicleStatus, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-last-service="<?= htmlspecialchars($vehicleLastService, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-description="<?= htmlspecialchars($vehicleDescription, ENT_QUOTES, 'UTF-8') ?>"
+								data-edit-vehicle-image="<?= htmlspecialchars($vehicleImage, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-vehicle-id="<?= $vehicleId ?>"
+								data-read-vehicle-status="<?= htmlspecialchars($vehicleStatus, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-maintenance-issue="<?= htmlspecialchars($maintenanceIssueDescription, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-maintenance-workshop="<?= htmlspecialchars($maintenanceWorkshopName, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-maintenance-estimate="<?= htmlspecialchars($maintenanceEstimateCompletionDate, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-maintenance-cost="<?= htmlspecialchars($maintenanceServiceCost, ENT_QUOTES, 'UTF-8') ?>"
+								data-delete-fleet-mode="<?= htmlspecialchars($fleetMode, ENT_QUOTES, 'UTF-8') ?>"
+								data-delete-fleet-type="<?= htmlspecialchars($selectedFleetType, ENT_QUOTES, 'UTF-8') ?>"
+								data-delete-fleet-status="<?= htmlspecialchars($selectedFleetStatus, ENT_QUOTES, 'UTF-8') ?>"
+							>
+								Edit
+							</button>
 							<?php if ($fleetMode !== 'status'): ?>
 								<button
 									class="admin-fleet-card__btn admin-fleet-card__btn--delete"

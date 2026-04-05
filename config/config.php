@@ -111,7 +111,7 @@ if (!defined('DB_PORT')) {
 		'DATABASE_PORT',
 		'MYSQL_PORT',
 		'MYSQLPORT',
-	], $dbUrlParts['port'] ?? 3306));
+	], $dbUrlParts['port'] ?? 3307));
 }
 
 if (!defined('DB_NAME')) {

@@ -23,7 +23,7 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 # Defaults for free demo mode.
 ENV USE_EMBEDDED_DB=1
 ENV DB_HOST=127.0.0.1
-ENV DB_PORT=3306
+ENV DB_PORT=3307
 ENV DB_NAME=ridex_db
 ENV DB_USER=ridex_app
 ENV DB_PASS=ridex_app_pass

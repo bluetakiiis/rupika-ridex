@@ -5,651 +5,2268 @@
  */
 
 (function () {
-	// admin login: stack-based modal navigation for menu/admin auth flow
-	const modals = Array.from(document.querySelectorAll(".menu-modal[data-modal-id]"));
-	if (modals.length === 0) {
-		return;
-	}
+  // admin login: stack-based modal navigation for menu/admin auth flow
+  const modals = Array.from(
+    document.querySelectorAll(".menu-modal[data-modal-id]"),
+  );
+  if (modals.length === 0) {
+    return;
+  }
 
-	const modalById = new Map();
-	modals.forEach((modal) => {
-		if (modal.id) {
-			modalById.set(modal.id, modal);
-		}
-	});
+  const modalById = new Map();
+  modals.forEach((modal) => {
+    if (modal.id) {
+      modalById.set(modal.id, modal);
+    }
+  });
 
-	const menuOpenButtons = Array.from(document.querySelectorAll("[data-menu-open]"));
-	const closeButtons = Array.from(document.querySelectorAll("[data-modal-close]"));
-	const backButtons = Array.from(document.querySelectorAll("[data-modal-back]"));
-	const targetButtons = Array.from(document.querySelectorAll("[data-modal-target]"));
-	const navigationLinks = Array.from(document.querySelectorAll(".menu-modal__link[href]"));
-	const passwordToggleButtons = Array.from(document.querySelectorAll("[data-password-toggle]"));
-	const adminLoginModal = document.getElementById("admin-login-modal");
-	const adminVehicleReadModal = document.getElementById("admin-vehicle-read-modal");
-	const adminDeleteVehicleModal = document.getElementById("admin-delete-vehicle-modal");
-	const adminDeleteVehicleIdInput = adminDeleteVehicleModal?.querySelector("[data-delete-vehicle-id-input]");
-	const adminDeleteVehicleNameNode = adminDeleteVehicleModal?.querySelector("[data-delete-vehicle-name]");
-	const adminDeleteFleetModeInput = adminDeleteVehicleModal?.querySelector("[data-delete-fleet-mode-input]");
-	const adminDeleteFleetTypeInput = adminDeleteVehicleModal?.querySelector("[data-delete-fleet-type-input]");
-	const adminDeleteFleetStatusInput = adminDeleteVehicleModal?.querySelector("[data-delete-fleet-status-input]");
-	const adminReadBookingNumberNode = adminVehicleReadModal?.querySelector("[data-read-booking-number]");
-	const adminReadCurrentUserLine = adminVehicleReadModal?.querySelector("[data-read-current-user-line]");
-	const adminReadCurrentUserNode = adminVehicleReadModal?.querySelector("[data-read-current-user]");
-	const adminReadStatusPill = adminVehicleReadModal?.querySelector("[data-read-status-pill]");
-	const adminReadMaintenanceIndicator = adminVehicleReadModal?.querySelector("[data-read-maintenance-indicator]");
-	const adminReadVehicleImage = adminVehicleReadModal?.querySelector("[data-read-vehicle-image]");
-	const adminReadVehicleTypeNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-type]");
-	const adminReadVehicleFullNameNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-full-name]");
-	const adminReadVehicleSeatsNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-seats]");
-	const adminReadVehicleTransmissionNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-transmission]");
-	const adminReadVehicleAgeNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-age]");
-	const adminReadVehicleFuelNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-fuel]");
-	const adminReadVehiclePlateNode = adminVehicleReadModal?.querySelector("[data-read-vehicle-plate]");
-	const adminReadStatusRowsNode = adminVehicleReadModal?.querySelector("[data-read-status-rows]");
-	const adminReadDeleteAction = adminVehicleReadModal?.querySelector("[data-read-delete-action]");
-	const adminLoginForm = adminLoginModal?.querySelector("[data-admin-login-form]");
-	const adminLoginInputs = adminLoginModal
-		? Array.from(adminLoginModal.querySelectorAll("[data-admin-login-input]"))
-		: [];
-	const adminPasswordInput = document.getElementById("admin-password-input");
-	const adminPasswordToggle = adminLoginModal?.querySelector(
-		"[data-password-toggle][data-password-target='admin-password-input']"
-	);
+  const menuOpenButtons = Array.from(
+    document.querySelectorAll("[data-menu-open]"),
+  );
+  const closeButtons = Array.from(
+    document.querySelectorAll("[data-modal-close]"),
+  );
+  const backButtons = Array.from(
+    document.querySelectorAll("[data-modal-back]"),
+  );
+  const targetButtons = Array.from(
+    document.querySelectorAll("[data-modal-target]"),
+  );
+  const navigationLinks = Array.from(
+    document.querySelectorAll(".menu-modal__link[href]"),
+  );
+  const passwordToggleButtons = Array.from(
+    document.querySelectorAll("[data-password-toggle]"),
+  );
+  const adminLoginModal = document.getElementById("admin-login-modal");
+  const adminVehicleReadModal = document.getElementById(
+    "admin-vehicle-read-modal",
+  );
+  const adminMaintenanceFillModal = document.getElementById(
+    "admin-maintenance-fill-modal",
+  );
+  const adminMaintenanceEditModal = document.getElementById(
+    "admin-maintenance-edit-modal",
+  );
+  const adminCreateVehicleModal = document.getElementById(
+    "admin-create-vehicle-modal",
+  );
+  const adminEditVehicleModal = document.getElementById(
+    "admin-edit-vehicle-modal",
+  );
+  const adminDeleteVehicleModal = document.getElementById(
+    "admin-delete-vehicle-modal",
+  );
+  const adminDeleteVehicleIdInput = adminDeleteVehicleModal?.querySelector(
+    "[data-delete-vehicle-id-input]",
+  );
+  const adminDeleteVehicleNameNode = adminDeleteVehicleModal?.querySelector(
+    "[data-delete-vehicle-name]",
+  );
+  const adminDeleteFleetModeInput = adminDeleteVehicleModal?.querySelector(
+    "[data-delete-fleet-mode-input]",
+  );
+  const adminDeleteFleetTypeInput = adminDeleteVehicleModal?.querySelector(
+    "[data-delete-fleet-type-input]",
+  );
+  const adminDeleteFleetStatusInput = adminDeleteVehicleModal?.querySelector(
+    "[data-delete-fleet-status-input]",
+  );
+  const adminReadBookingNumberNode = adminVehicleReadModal?.querySelector(
+    "[data-read-booking-number]",
+  );
+  const adminReadCurrentUserLine = adminVehicleReadModal?.querySelector(
+    "[data-read-current-user-line]",
+  );
+  const adminReadCurrentUserNode = adminVehicleReadModal?.querySelector(
+    "[data-read-current-user]",
+  );
+  const adminReadStatusPill = adminVehicleReadModal?.querySelector(
+    "[data-read-status-pill]",
+  );
+  const adminReadMaintenanceIndicator = adminVehicleReadModal?.querySelector(
+    "[data-read-maintenance-indicator]",
+  );
+  const adminReadVehicleImage = adminVehicleReadModal?.querySelector(
+    "[data-read-vehicle-image]",
+  );
+  const adminReadVehicleTypeNode = adminVehicleReadModal?.querySelector(
+    "[data-read-vehicle-type]",
+  );
+  const adminReadVehicleFullNameNode = adminVehicleReadModal?.querySelector(
+    "[data-read-vehicle-full-name]",
+  );
+  const adminReadVehicleSeatsNode = adminVehicleReadModal?.querySelector(
+    "[data-read-vehicle-seats]",
+  );
+  const adminReadVehicleTransmissionNode = adminVehicleReadModal?.querySelector(
+    "[data-read-vehicle-transmission]",
+  );
+  const adminReadVehicleAgeNode = adminVehicleReadModal?.querySelector(
+    "[data-read-vehicle-age]",
+  );
+  const adminReadVehicleFuelNode = adminVehicleReadModal?.querySelector(
+    "[data-read-vehicle-fuel]",
+  );
+  const adminReadVehiclePlateNode = adminVehicleReadModal?.querySelector(
+    "[data-read-vehicle-plate]",
+  );
+  const adminReadStatusRowsNode = adminVehicleReadModal?.querySelector(
+    "[data-read-status-rows]",
+  );
+  const adminReadDeleteAction = adminVehicleReadModal?.querySelector(
+    "[data-read-delete-action]",
+  );
+  const adminReadEditAction = adminVehicleReadModal?.querySelector(
+    "[data-read-edit-action]",
+  );
+  const adminMaintenanceFillForm = adminMaintenanceFillModal?.querySelector(
+    "[data-maintenance-fill-form]",
+  );
+  const adminMaintenanceFillVehicleIdInput =
+    adminMaintenanceFillModal?.querySelector(
+      "[data-maintenance-vehicle-id-input]",
+    );
+  const adminMaintenanceFillFleetModeInput =
+    adminMaintenanceFillModal?.querySelector(
+      "[data-maintenance-fleet-mode-input]",
+    );
+  const adminMaintenanceFillFleetTypeInput =
+    adminMaintenanceFillModal?.querySelector(
+      "[data-maintenance-fleet-type-input]",
+    );
+  const adminMaintenanceFillFleetStatusInput =
+    adminMaintenanceFillModal?.querySelector(
+      "[data-maintenance-fleet-status-input]",
+    );
+  const adminMaintenanceFillIssueInput =
+    adminMaintenanceFillModal?.querySelector("[data-maintenance-issue-input]");
+  const adminMaintenanceFillWorkshopInput =
+    adminMaintenanceFillModal?.querySelector(
+      "[data-maintenance-workshop-input]",
+    );
+  const adminMaintenanceFillEstimateInput =
+    adminMaintenanceFillModal?.querySelector(
+      "[data-maintenance-estimate-input]",
+    );
+  const adminMaintenanceFillCostInput =
+    adminMaintenanceFillModal?.querySelector("[data-maintenance-cost-input]");
+  const adminMaintenanceEditForm = adminMaintenanceEditModal?.querySelector(
+    "[data-maintenance-edit-form]",
+  );
+  const adminMaintenanceEditVehicleIdInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-edit-vehicle-id-input]",
+    );
+  const adminMaintenanceEditFleetModeInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-edit-fleet-mode-input]",
+    );
+  const adminMaintenanceEditFleetTypeInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-edit-fleet-type-input]",
+    );
+  const adminMaintenanceEditFleetStatusInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-edit-fleet-status-input]",
+    );
+  const adminMaintenanceEditIssueInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-edit-issue-input]",
+    );
+  const adminMaintenanceEditWorkshopInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-edit-workshop-input]",
+    );
+  const adminMaintenanceEditEstimateInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-edit-estimate-input]",
+    );
+  const adminMaintenanceEditCostInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-edit-cost-input]",
+    );
+  const adminMaintenanceCompleteVehicleIdInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-complete-vehicle-id-input]",
+    );
+  const adminMaintenanceCompleteFleetModeInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-complete-fleet-mode-input]",
+    );
+  const adminMaintenanceCompleteFleetTypeInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-complete-fleet-type-input]",
+    );
+  const adminMaintenanceCompleteFleetStatusInput =
+    adminMaintenanceEditModal?.querySelector(
+      "[data-maintenance-complete-fleet-status-input]",
+    );
+  const adminCreateVehicleForm = adminCreateVehicleModal?.querySelector(
+    "[data-admin-create-vehicle-form]",
+  );
+  const adminCreateStepLabel = adminCreateVehicleModal?.querySelector(
+    "[data-create-step-label]",
+  );
+  const adminCreateStepPanels = adminCreateVehicleModal
+    ? Array.from(
+        adminCreateVehicleModal.querySelectorAll("[data-create-step-panel]"),
+      )
+    : [];
+  const adminCreateStepNextButtons = adminCreateVehicleModal
+    ? Array.from(
+        adminCreateVehicleModal.querySelectorAll("[data-create-step-next]"),
+      )
+    : [];
+  const adminCreateStepPrevButtons = adminCreateVehicleModal
+    ? Array.from(
+        adminCreateVehicleModal.querySelectorAll("[data-create-step-prev]"),
+      )
+    : [];
+  const adminCreateStepCloseButton = adminCreateVehicleModal?.querySelector(
+    "[data-create-step-close]",
+  );
+  const adminCreateFleetModeInput = adminCreateVehicleModal?.querySelector(
+    "[data-create-fleet-mode-input]",
+  );
+  const adminCreateFleetTypeInput = adminCreateVehicleModal?.querySelector(
+    "[data-create-fleet-type-input]",
+  );
+  const adminCreateVehicleTypeInput = adminCreateVehicleModal?.querySelector(
+    "[data-create-vehicle-type-input]",
+  );
+  const adminCreateImageInput = adminCreateVehicleModal?.querySelector(
+    "[data-create-image-input]",
+  );
+  const adminCreateImageNameInput = document.getElementById(
+    "create-vehicle-image-name",
+  );
+  const adminCreateImageClearButton = adminCreateVehicleModal?.querySelector(
+    "[data-create-image-clear]",
+  );
+  const adminEditVehicleForm = adminEditVehicleModal?.querySelector(
+    "[data-admin-edit-vehicle-form]",
+  );
+  const adminEditStepPanels = adminEditVehicleModal
+    ? Array.from(
+        adminEditVehicleModal.querySelectorAll("[data-edit-step-panel]"),
+      )
+    : [];
+  const adminEditStepNextButtons = adminEditVehicleModal
+    ? Array.from(
+        adminEditVehicleModal.querySelectorAll("[data-edit-step-next]"),
+      )
+    : [];
+  const adminEditStepPrevButtons = adminEditVehicleModal
+    ? Array.from(
+        adminEditVehicleModal.querySelectorAll("[data-edit-step-prev]"),
+      )
+    : [];
+  const adminEditStepCloseButton = adminEditVehicleModal?.querySelector(
+    "[data-edit-step-close]",
+  );
+  const adminEditVehicleIdInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-id-input]",
+  );
+  const adminEditCurrentImagePathInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-current-image-path-input]",
+  );
+  const adminEditFleetModeInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-fleet-mode-input]",
+  );
+  const adminEditFleetTypeInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-fleet-type-input]",
+  );
+  const adminEditFleetStatusInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-fleet-status-input]",
+  );
+  const adminEditVehicleTypeInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-type-input]",
+  );
+  const adminEditFullNameInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-full-name-input]",
+  );
+  const adminEditShortNameInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-short-name-input]",
+  );
+  const adminEditPriceInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-price-input]",
+  );
+  const adminEditDriverAgeInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-driver-age-input]",
+  );
+  const adminEditSeatsInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-seats-input]",
+  );
+  const adminEditTransmissionInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-transmission-input]",
+  );
+  const adminEditFuelInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-fuel-input]",
+  );
+  const adminEditLicenseInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-license-input]",
+  );
+  const adminEditGpsInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-gps-id-input]",
+  );
+  const adminEditStatusInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-status-input]",
+  );
+  const adminEditLastServiceInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-last-service-input]",
+  );
+  const adminEditDescriptionInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-vehicle-description-input]",
+  );
+  const adminEditImageInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-image-input]",
+  );
+  const adminEditImageNameInput = adminEditVehicleModal?.querySelector(
+    "[data-edit-image-name-input]",
+  );
+  const adminEditImageClearButton = adminEditVehicleModal?.querySelector(
+    "[data-edit-image-clear]",
+  );
+  const adminCreateSelectInputs = Array.from(
+    document.querySelectorAll(".admin-create-vehicle-modal__select"),
+  );
+  const adminLoginForm = adminLoginModal?.querySelector(
+    "[data-admin-login-form]",
+  );
+  const adminLoginInputs = adminLoginModal
+    ? Array.from(adminLoginModal.querySelectorAll("[data-admin-login-input]"))
+    : [];
+  const adminPasswordInput = document.getElementById("admin-password-input");
+  const adminPasswordToggle = adminLoginModal?.querySelector(
+    "[data-password-toggle][data-password-target='admin-password-input']",
+  );
 
-	let lastFocusedElement = null;
-	const modalHistory = [];
+  let lastFocusedElement = null;
+  const modalHistory = [];
+  let readModalContext = null;
+  let createVehicleStep = 1;
+  let editVehicleStep = 1;
+  const createCustomSelectControllers = [];
+  let openCreateCustomSelectController = null;
 
-	const clearAdminLoginUiState = () => {
-		if (adminLoginForm instanceof HTMLFormElement) {
-			adminLoginForm.reset();
-		}
+  const clearAdminLoginUiState = () => {
+    if (adminLoginForm instanceof HTMLFormElement) {
+      adminLoginForm.reset();
+    }
 
-		adminLoginInputs.forEach((input) => {
-			if (input instanceof HTMLElement) {
-				input.classList.remove("admin-login-form__input--error");
-			}
-		});
+    adminLoginInputs.forEach((input) => {
+      if (input instanceof HTMLElement) {
+        input.classList.remove("admin-login-form__input--error");
+      }
+    });
 
-		const loginError = adminLoginModal?.querySelector("[data-admin-login-error]");
-		if (loginError instanceof HTMLElement) {
-			loginError.remove();
-		}
+    const loginError = adminLoginModal?.querySelector(
+      "[data-admin-login-error]",
+    );
+    if (loginError instanceof HTMLElement) {
+      loginError.remove();
+    }
 
-		if (adminPasswordInput instanceof HTMLInputElement) {
-			adminPasswordInput.type = "password";
-		}
+    if (adminPasswordInput instanceof HTMLInputElement) {
+      adminPasswordInput.type = "password";
+    }
 
-		if (adminPasswordToggle instanceof HTMLElement) {
-			adminPasswordToggle.setAttribute("aria-label", "Show password");
-			const icon = adminPasswordToggle.querySelector(".material-symbols-rounded");
-			if (icon) {
-				icon.textContent = "visibility";
-			}
-		}
-	};
+    if (adminPasswordToggle instanceof HTMLElement) {
+      adminPasswordToggle.setAttribute("aria-label", "Show password");
+      const icon = adminPasswordToggle.querySelector(
+        ".material-symbols-rounded",
+      );
+      if (icon) {
+        icon.textContent = "visibility";
+      }
+    }
+  };
 
-	// read modal reference: C:\Users\User\Downloads\Ridex includes the 5-status read examples, and available status has an extra maintenance icon.
-	const readStatusLabels = {
-		available: "Available",
-		reserved: "Reserved",
-		on_trip: "On Trip",
-		overdue: "Overdue",
-		maintenance: "Maintenance",
-	};
+  // read modal reference: C:\Users\User\Downloads\Ridex includes the 5-status read examples, and available status has an extra maintenance icon.
+  const readStatusLabels = {
+    available: "Available",
+    reserved: "Reserved",
+    on_trip: "On Trip",
+    overdue: "Overdue",
+    maintenance: "Maintenance",
+  };
 
-	const readUnavailableText = "unavailable";
-	const readUserNotApplicableText = "N/A";
-	const readUserStatuses = ["reserved", "on_trip", "overdue"];
+  const readUnavailableText = "unavailable";
+  const readUserNotApplicableText = "N/A";
+  const readUserStatuses = ["reserved", "on_trip", "overdue"];
 
-	const toTitleCase = (rawValue) =>
-		String(rawValue || "")
-			.replace(/[_-]+/g, " ")
-			.replace(/\b\w/g, (character) => character.toUpperCase());
+  const toTitleCase = (rawValue) =>
+    String(rawValue || "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase());
 
-	const isReadValueMissing = (rawValue) =>
-		rawValue === null || rawValue === undefined || String(rawValue).trim() === "";
+  const isReadValueMissing = (rawValue) =>
+    rawValue === null ||
+    rawValue === undefined ||
+    String(rawValue).trim() === "";
 
-	const getReadMissingFallback = (statusKey, isUserRelated = false) => {
-		if (isUserRelated && (statusKey === "available" || statusKey === "maintenance")) {
-			return readUserNotApplicableText;
-		}
+  const getReadMissingFallback = (statusKey, isUserRelated = false) => {
+    if (
+      isUserRelated &&
+      (statusKey === "available" || statusKey === "maintenance")
+    ) {
+      return readUserNotApplicableText;
+    }
 
-		return readUnavailableText;
-	};
+    return readUnavailableText;
+  };
 
-	const normalizeReadValue = (rawValue, statusKey, isUserRelated = false) => {
-		if (isReadValueMissing(rawValue)) {
-			return getReadMissingFallback(statusKey, isUserRelated);
-		}
+  const normalizeReadValue = (rawValue, statusKey, isUserRelated = false) => {
+    if (isReadValueMissing(rawValue)) {
+      return getReadMissingFallback(statusKey, isUserRelated);
+    }
 
-		return String(rawValue).trim();
-	};
+    return String(rawValue).trim();
+  };
 
-	const formatReadDate = (rawValue, statusKey, isUserRelated = false) => {
-		if (isReadValueMissing(rawValue)) {
-			return getReadMissingFallback(statusKey, isUserRelated);
-		}
+  const formatReadDate = (rawValue, statusKey, isUserRelated = false) => {
+    if (isReadValueMissing(rawValue)) {
+      return getReadMissingFallback(statusKey, isUserRelated);
+    }
 
-		const text = String(rawValue).trim();
+    const text = String(rawValue).trim();
 
-		const parsedDate = new Date(text.replace(" ", "T"));
-		if (Number.isNaN(parsedDate.getTime())) {
-			return getReadMissingFallback(statusKey, isUserRelated);
-		}
+    const parsedDate = new Date(text.replace(" ", "T"));
+    if (Number.isNaN(parsedDate.getTime())) {
+      return getReadMissingFallback(statusKey, isUserRelated);
+    }
 
-		const day = String(parsedDate.getDate()).padStart(2, "0");
-		const month = parsedDate.toLocaleString("en-US", { month: "short" });
-		const year = parsedDate.getFullYear();
+    const day = String(parsedDate.getDate()).padStart(2, "0");
+    const month = parsedDate.toLocaleString("en-US", { month: "short" });
+    const year = parsedDate.getFullYear();
 
-		return `${day} ${month}, ${year}`;
-	};
+    return `${day} ${month}, ${year}`;
+  };
 
-	const formatReadCurrency = (rawValue, statusKey, isUserRelated = false) => {
-		if (isReadValueMissing(rawValue)) {
-			return getReadMissingFallback(statusKey, isUserRelated);
-		}
+  const formatReadCurrency = (rawValue, statusKey, isUserRelated = false) => {
+    if (isReadValueMissing(rawValue)) {
+      return getReadMissingFallback(statusKey, isUserRelated);
+    }
 
-		const numericValue = Number.parseFloat(String(rawValue).trim());
-		if (!Number.isFinite(numericValue)) {
-			return getReadMissingFallback(statusKey, isUserRelated);
-		}
+    const numericValue = Number.parseFloat(String(rawValue).trim());
+    if (!Number.isFinite(numericValue)) {
+      return getReadMissingFallback(statusKey, isUserRelated);
+    }
 
-		return `$${numericValue.toFixed(2)}`;
-	};
+    return `$${numericValue.toFixed(2)}`;
+  };
 
-	const escapeHtml = (rawValue) =>
-		String(rawValue || "")
-			.replace(/&/g, "&amp;")
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;")
-			.replace(/"/g, "&quot;")
-			.replace(/'/g, "&#39;");
+  const escapeHtml = (rawValue) =>
+    String(rawValue || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
-	const buildReadStatusRows = (statusKey, details) => {
-		const rows = [];
-		const formattedLastServiceDate = formatReadDate(details.lastServiceDate, statusKey, false);
+  const buildReadStatusRows = (statusKey, details) => {
+    const rows = [];
+    const formattedLastServiceDate = formatReadDate(
+      details.lastServiceDate,
+      statusKey,
+      false,
+    );
 
-		if (statusKey === "available") {
-			rows.push(["Last Service Date", formattedLastServiceDate]);
-			rows.push(["Upcoming Reservations", formatReadDate(details.upcomingPickupDatetime, statusKey, false)]);
-			rows.push(["Total Earnings", formatReadCurrency(details.totalEarnings, statusKey, false)]);
-			rows.push(["Total Reservations", normalizeReadValue(details.totalReservations, statusKey, false)]);
-			return rows;
-		}
+    if (statusKey === "available") {
+      rows.push(["Last Service Date", formattedLastServiceDate]);
+      rows.push([
+        "Upcoming Reservations",
+        formatReadDate(details.upcomingPickupDatetime, statusKey, false),
+      ]);
+      rows.push([
+        "Total Earnings",
+        formatReadCurrency(details.totalEarnings, statusKey, false),
+      ]);
+      rows.push([
+        "Total Reservations",
+        normalizeReadValue(details.totalReservations, statusKey, false),
+      ]);
+      return rows;
+    }
 
-		if (statusKey === "reserved") {
-			const reservedPaymentStatus = normalizeReadValue(details.paymentStatus, statusKey, false);
-			rows.push(["Last Service Date", formattedLastServiceDate]);
-			rows.push(["Pickup Date", formatReadDate(details.pickupDatetime, statusKey, false)]);
-			rows.push(["Return Date", formatReadDate(details.returnDatetime, statusKey, false)]);
-			rows.push([
-				"Payment Status",
-				reservedPaymentStatus === readUnavailableText ? readUnavailableText : toTitleCase(reservedPaymentStatus),
-			]);
-			return rows;
-		}
+    if (statusKey === "reserved") {
+      const reservedPaymentStatus = normalizeReadValue(
+        details.paymentStatus,
+        statusKey,
+        false,
+      );
+      rows.push(["Last Service Date", formattedLastServiceDate]);
+      rows.push([
+        "Pickup Date",
+        formatReadDate(details.pickupDatetime, statusKey, false),
+      ]);
+      rows.push([
+        "Return Date",
+        formatReadDate(details.returnDatetime, statusKey, false),
+      ]);
+      rows.push([
+        "Payment Status",
+        reservedPaymentStatus === readUnavailableText
+          ? readUnavailableText
+          : toTitleCase(reservedPaymentStatus),
+      ]);
+      return rows;
+    }
 
-		if (statusKey === "on_trip") {
-			const onTripPaymentStatus = normalizeReadValue(details.paymentStatus, statusKey, false);
-			rows.push(["Last Service Date", formattedLastServiceDate]);
-			rows.push(["Pickup Date", formatReadDate(details.pickupDatetime, statusKey, false)]);
-			rows.push(["Return Date", formatReadDate(details.returnDatetime, statusKey, false)]);
-			rows.push(["Current Location", normalizeReadValue(details.currentLocation, statusKey, false)]);
-			rows.push([
-				"Payment Status",
-				onTripPaymentStatus === readUnavailableText ? readUnavailableText : toTitleCase(onTripPaymentStatus),
-			]);
-			return rows;
-		}
+    if (statusKey === "on_trip") {
+      const onTripPaymentStatus = normalizeReadValue(
+        details.paymentStatus,
+        statusKey,
+        false,
+      );
+      rows.push(["Last Service Date", formattedLastServiceDate]);
+      rows.push([
+        "Pickup Date",
+        formatReadDate(details.pickupDatetime, statusKey, false),
+      ]);
+      rows.push([
+        "Return Date",
+        formatReadDate(details.returnDatetime, statusKey, false),
+      ]);
+      rows.push([
+        "Current Location",
+        normalizeReadValue(details.currentLocation, statusKey, false),
+      ]);
+      rows.push([
+        "Payment Status",
+        onTripPaymentStatus === readUnavailableText
+          ? readUnavailableText
+          : toTitleCase(onTripPaymentStatus),
+      ]);
+      return rows;
+    }
 
-		if (statusKey === "overdue") {
-			const overduePaymentStatus = normalizeReadValue(details.paymentStatus, statusKey, false);
-			let overdueDateLabel = formatReadDate(details.returnDatetime, statusKey, false);
-			const parsedReturnDatetime = new Date(String(details.returnDatetime || "").replace(" ", "T"));
-			if (
-				overdueDateLabel !== readUnavailableText &&
-				overdueDateLabel !== readUserNotApplicableText &&
-				!Number.isNaN(parsedReturnDatetime.getTime())
-			) {
-				const nowTimestamp = Date.now();
-				const overdueHours = Math.floor((nowTimestamp - parsedReturnDatetime.getTime()) / (1000 * 60 * 60));
-				if (overdueHours > 0) {
-					overdueDateLabel = `${escapeHtml(overdueDateLabel)} <span class="admin-vehicle-read-modal__overdue-hours">+${overdueHours} hours</span>`;
-				} else {
-					overdueDateLabel = escapeHtml(overdueDateLabel);
-				}
-			} else {
-				overdueDateLabel = escapeHtml(overdueDateLabel);
-			}
+    if (statusKey === "overdue") {
+      const overduePaymentStatus = normalizeReadValue(
+        details.paymentStatus,
+        statusKey,
+        false,
+      );
+      let overdueDateLabel = formatReadDate(
+        details.returnDatetime,
+        statusKey,
+        false,
+      );
+      const parsedReturnDatetime = new Date(
+        String(details.returnDatetime || "").replace(" ", "T"),
+      );
+      if (
+        overdueDateLabel !== readUnavailableText &&
+        overdueDateLabel !== readUserNotApplicableText &&
+        !Number.isNaN(parsedReturnDatetime.getTime())
+      ) {
+        const nowTimestamp = Date.now();
+        const overdueHours = Math.floor(
+          (nowTimestamp - parsedReturnDatetime.getTime()) / (1000 * 60 * 60),
+        );
+        if (overdueHours > 0) {
+          overdueDateLabel = `${escapeHtml(overdueDateLabel)} <span class="admin-vehicle-read-modal__overdue-hours">+${overdueHours} hours</span>`;
+        } else {
+          overdueDateLabel = escapeHtml(overdueDateLabel);
+        }
+      } else {
+        overdueDateLabel = escapeHtml(overdueDateLabel);
+      }
 
-			rows.push(["Last Service Date", formattedLastServiceDate]);
-			rows.push(["Return Date", overdueDateLabel, true]);
-			rows.push(["Current Location", normalizeReadValue(details.currentLocation, statusKey, false)]);
-			rows.push(["Total Late Fee ($10/h)", formatReadCurrency(details.lateFee, statusKey, false)]);
-			rows.push([
-				"Payment Status",
-				overduePaymentStatus === readUnavailableText ? readUnavailableText : toTitleCase(overduePaymentStatus),
-			]);
-			return rows;
-		}
+      rows.push(["Last Service Date", formattedLastServiceDate]);
+      rows.push(["Return Date", overdueDateLabel, true]);
+      rows.push([
+        "Current Location",
+        normalizeReadValue(details.currentLocation, statusKey, false),
+      ]);
+      rows.push([
+        "Total Late Fee ($10/h)",
+        formatReadCurrency(details.lateFee, statusKey, false),
+      ]);
+      rows.push([
+        "Payment Status",
+        overduePaymentStatus === readUnavailableText
+          ? readUnavailableText
+          : toTitleCase(overduePaymentStatus),
+      ]);
+      return rows;
+    }
 
-		rows.push(["Issue Description", readUnavailableText]);
-		rows.push(["Workshop Name", normalizeReadValue(details.maintenanceWorkshop, statusKey, false)]);
-		rows.push([
-			"Est. Completion",
-			formatReadDate(
-				details.maintenanceEstimateDatetime || details.upcomingPickupDatetime || details.returnDatetime,
-				statusKey,
-				false
-			),
-		]);
-		rows.push(["Service Cost", formatReadCurrency(details.maintenanceCost, statusKey, false)]);
-		return rows;
-	};
+    rows.push([
+      "Issue Description",
+      normalizeReadValue(details.maintenanceIssueDescription, statusKey, false),
+    ]);
+    rows.push([
+      "Workshop Name",
+      normalizeReadValue(details.maintenanceWorkshop, statusKey, false),
+    ]);
+    rows.push([
+      "Est. Completion",
+      formatReadDate(
+        details.maintenanceEstimateDatetime ||
+          details.upcomingPickupDatetime ||
+          details.returnDatetime,
+        statusKey,
+        false,
+      ),
+    ]);
+    rows.push([
+      "Service Cost",
+      formatReadCurrency(details.maintenanceCost, statusKey, false),
+    ]);
+    return rows;
+  };
 
-	const updateReadStatusRows = (statusKey, details) => {
-		if (!(adminReadStatusRowsNode instanceof HTMLElement)) {
-			return;
-		}
+  const updateReadStatusRows = (statusKey, details) => {
+    if (!(adminReadStatusRowsNode instanceof HTMLElement)) {
+      return;
+    }
 
-		const rows = buildReadStatusRows(statusKey, details);
-		const rowMarkup = rows
-			.map(([label, value, isHtml]) => {
-				const safeLabel = escapeHtml(label || "");
-				const safeValue = String(value || "N/A");
-				return `
+    const rows = buildReadStatusRows(statusKey, details);
+    const rowMarkup = rows
+      .map(([label, value, isHtml]) => {
+        const safeLabel = escapeHtml(label || "");
+        const safeValue = String(value || "N/A");
+        return `
 					<tr>
 						<th scope="row">${safeLabel}</th>
 						<td>${isHtml ? safeValue : escapeHtml(safeValue)}</td>
 					</tr>
 				`;
-			})
-			.join("");
+      })
+      .join("");
 
-		adminReadStatusRowsNode.innerHTML = rowMarkup;
-	};
+    adminReadStatusRowsNode.innerHTML = rowMarkup;
+  };
 
-	const hydrateReadVehicleModal = (triggerButton) => {
-		if (!(triggerButton instanceof HTMLElement)) {
-			return;
-		}
+  // maintenance edit/fillup form: normalize YYYY-MM-DD date values for date inputs.
+  const toDateInputValue = (rawValue) => {
+    if (isReadValueMissing(rawValue)) {
+      return "";
+    }
 
-		const vehicleId = Number.parseInt(triggerButton.getAttribute("data-read-vehicle-id") || "0", 10);
-		const vehicleName = triggerButton.getAttribute("data-read-vehicle-name") || "Vehicle";
-		const vehicleFullName = triggerButton.getAttribute("data-read-vehicle-full-name") || vehicleName;
-		const vehicleTypeRaw = (triggerButton.getAttribute("data-read-vehicle-type") || "cars").toLowerCase();
-		const vehicleStatusRaw = (triggerButton.getAttribute("data-read-vehicle-status") || "available").toLowerCase();
-		const vehicleStatus = Object.prototype.hasOwnProperty.call(readStatusLabels, vehicleStatusRaw)
-			? vehicleStatusRaw
-			: "available";
-		const fleetModeForReadModal = triggerButton.getAttribute("data-delete-fleet-mode") || "type";
+    const normalized = String(rawValue).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      return normalized;
+    }
 
-		const bookingNumber = triggerButton.getAttribute("data-read-booking-number") || "";
-		const bookingUserName = triggerButton.getAttribute("data-read-booking-user-name") || "";
-		const bookingUserPhone = triggerButton.getAttribute("data-read-booking-user-phone") || "";
-		const pickupDatetime = triggerButton.getAttribute("data-read-booking-pickup") || "";
-		const returnDatetime = triggerButton.getAttribute("data-read-booking-return") || "";
-		const paymentStatus = triggerButton.getAttribute("data-read-booking-payment-status") || "";
-		const lateFee = triggerButton.getAttribute("data-read-booking-late-fee") || "";
-		const latitude = triggerButton.getAttribute("data-read-gps-latitude") || "";
-		const longitude = triggerButton.getAttribute("data-read-gps-longitude") || "";
-		const currentLocation =
-			latitude !== "" && longitude !== "" ? `${latitude}, ${longitude}` : "";
+    const parsedDate = new Date(normalized.replace(" ", "T"));
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "";
+    }
 
-		const details = {
-			lastServiceDate: triggerButton.getAttribute("data-read-vehicle-last-service") || "",
-			description: triggerButton.getAttribute("data-read-vehicle-description") || "",
-			maintenanceWorkshop:
-				triggerButton.getAttribute("data-read-maintenance-workshop") || "",
-			maintenanceEstimateDatetime:
-				triggerButton.getAttribute("data-read-maintenance-estimate") || "",
-			maintenanceCost: triggerButton.getAttribute("data-read-maintenance-cost") || "",
-			upcomingPickupDatetime: triggerButton.getAttribute("data-read-upcoming-pickup") || "",
-			totalReservations: triggerButton.getAttribute("data-read-total-reservations") || "0",
-			totalEarnings: triggerButton.getAttribute("data-read-total-earnings") || "0",
-			pickupDatetime,
-			returnDatetime,
-			paymentStatus,
-			lateFee,
-			currentLocation,
-		};
+    const day = String(parsedDate.getDate()).padStart(2, "0");
+    const month = parsedDate.toLocaleString("en-US", { month: "short" });
+    const year = parsedDate.getFullYear();
+    return `${day} ${month}, ${year}`;
+  };
 
-		const isUserStatus = readUserStatuses.includes(vehicleStatus);
+  // maintenance edit/fillup form: populate create modal with currently selected available vehicle context.
+  const resolveMaintenanceContext = (triggerButton = null) => {
+    if (triggerButton instanceof HTMLElement) {
+      const triggerVehicleId = Number.parseInt(
+        triggerButton.getAttribute("data-read-vehicle-id") || "0",
+        10,
+      );
+      const triggerIssue =
+        triggerButton.getAttribute("data-read-maintenance-issue") || "";
+      const triggerWorkshop =
+        triggerButton.getAttribute("data-read-maintenance-workshop") || "";
+      const triggerEstimate =
+        triggerButton.getAttribute("data-read-maintenance-estimate") || "";
+      const triggerCost =
+        triggerButton.getAttribute("data-read-maintenance-cost") || "";
 
-		if (adminReadBookingNumberNode instanceof HTMLElement) {
-			adminReadBookingNumberNode.textContent = isUserStatus
-				? normalizeReadValue(bookingNumber, vehicleStatus, true)
-				: readUserNotApplicableText;
-		}
+      if (
+        triggerVehicleId > 0 ||
+        triggerIssue ||
+        triggerWorkshop ||
+        triggerEstimate ||
+        triggerCost
+      ) {
+        return {
+          vehicleId: triggerVehicleId,
+          vehicleStatus: (
+            triggerButton.getAttribute("data-read-vehicle-status") ||
+            "maintenance"
+          ).toLowerCase(),
+          fleetMode:
+            triggerButton.getAttribute("data-delete-fleet-mode") || "status",
+          fleetType:
+            triggerButton.getAttribute("data-delete-fleet-type") || "cars",
+          fleetStatus:
+            triggerButton.getAttribute("data-delete-fleet-status") ||
+            "maintenance",
+          maintenanceIssueDescription: triggerIssue,
+          maintenanceWorkshop: triggerWorkshop,
+          maintenanceEstimateDatetime: triggerEstimate,
+          maintenanceCost: triggerCost,
+        };
+      }
+    }
 
-		if (adminReadCurrentUserLine instanceof HTMLElement && adminReadCurrentUserNode instanceof HTMLElement) {
-			adminReadCurrentUserLine.hidden = !isUserStatus;
+    return readModalContext;
+  };
 
-			if (!isUserStatus) {
-				adminReadCurrentUserNode.textContent = "";
-			} else {
-				const hasFullUserDetails = !isReadValueMissing(bookingUserName) && !isReadValueMissing(bookingUserPhone);
-				adminReadCurrentUserNode.textContent = hasFullUserDetails
-					? `${String(bookingUserName).trim()} ${String(bookingUserPhone).trim()}`
-					: readUnavailableText;
-			}
-		}
+  // maintenance edit/fillup form: populate create modal with currently selected available vehicle context.
+  const hydrateMaintenanceFillModal = (triggerButton = null) => {
+    const maintenanceContext = resolveMaintenanceContext(triggerButton);
+    if (!maintenanceContext) {
+      return;
+    }
 
-		if (adminReadStatusPill instanceof HTMLElement) {
-			adminReadStatusPill.textContent = readStatusLabels[vehicleStatus] || "Available";
-			adminReadStatusPill.className = `admin-vehicle-read-modal__status-pill admin-vehicle-read-modal__status-pill--${vehicleStatus.replace("_", "-")}`;
-		}
+    if (adminMaintenanceFillForm instanceof HTMLFormElement) {
+      adminMaintenanceFillForm.reset();
+    }
 
-		if (adminReadMaintenanceIndicator instanceof HTMLElement) {
-			const showMaintenanceIndicator =
-				fleetModeForReadModal === "type" && vehicleStatus === "available";
-			adminReadMaintenanceIndicator.hidden = !showMaintenanceIndicator;
-		}
+    if (adminMaintenanceFillVehicleIdInput instanceof HTMLInputElement) {
+      adminMaintenanceFillVehicleIdInput.value = String(
+        maintenanceContext.vehicleId || "",
+      );
+    }
 
-		if (adminReadVehicleImage instanceof HTMLImageElement) {
-			adminReadVehicleImage.src = triggerButton.getAttribute("data-read-vehicle-image") || "images/vehicle-feature.png";
-			adminReadVehicleImage.alt = vehicleName;
-		}
+    if (adminMaintenanceFillFleetModeInput instanceof HTMLInputElement) {
+      adminMaintenanceFillFleetModeInput.value =
+        maintenanceContext.fleetMode || "type";
+    }
 
-		if (adminReadVehicleTypeNode instanceof HTMLElement) {
-			adminReadVehicleTypeNode.textContent = toTitleCase(vehicleTypeRaw.replace(/s$/, ""));
-		}
+    if (adminMaintenanceFillFleetTypeInput instanceof HTMLInputElement) {
+      adminMaintenanceFillFleetTypeInput.value =
+        maintenanceContext.fleetType || "cars";
+    }
 
-		if (adminReadVehicleFullNameNode instanceof HTMLElement) {
-			adminReadVehicleFullNameNode.textContent = vehicleFullName;
-		}
+    if (adminMaintenanceFillFleetStatusInput instanceof HTMLInputElement) {
+      adminMaintenanceFillFleetStatusInput.value =
+        maintenanceContext.fleetStatus || "maintenance";
+    }
 
-		if (adminReadVehicleSeatsNode instanceof HTMLElement) {
-			const seatsValue = normalizeReadValue(
-				triggerButton.getAttribute("data-read-vehicle-seats"),
-				vehicleStatus,
-				false
-			);
-			adminReadVehicleSeatsNode.textContent =
-				seatsValue === readUnavailableText ? readUnavailableText : `${seatsValue} Seats`;
-		}
+    if (adminMaintenanceFillIssueInput instanceof HTMLInputElement) {
+      adminMaintenanceFillIssueInput.value =
+        maintenanceContext.maintenanceIssueDescription || "";
+    }
 
-		if (adminReadVehicleTransmissionNode instanceof HTMLElement) {
-			adminReadVehicleTransmissionNode.textContent = toTitleCase(
-				normalizeReadValue(triggerButton.getAttribute("data-read-vehicle-transmission"), vehicleStatus, false)
-			);
-		}
+    if (adminMaintenanceFillWorkshopInput instanceof HTMLInputElement) {
+      adminMaintenanceFillWorkshopInput.value =
+        maintenanceContext.maintenanceWorkshop || "";
+    }
 
-		if (adminReadVehicleAgeNode instanceof HTMLElement) {
-			const ageValue = normalizeReadValue(
-				triggerButton.getAttribute("data-read-vehicle-age"),
-				vehicleStatus,
-				false
-			);
-			adminReadVehicleAgeNode.textContent =
-				ageValue === readUnavailableText ? readUnavailableText : `${ageValue}+ Years`;
-		}
+    if (adminMaintenanceFillEstimateInput instanceof HTMLInputElement) {
+      adminMaintenanceFillEstimateInput.value = toDateInputValue(
+        maintenanceContext.maintenanceEstimateDatetime || "",
+      );
+    }
 
-		if (adminReadVehicleFuelNode instanceof HTMLElement) {
-			adminReadVehicleFuelNode.textContent = toTitleCase(
-				normalizeReadValue(triggerButton.getAttribute("data-read-vehicle-fuel"), vehicleStatus, false)
-			);
-		}
+    if (adminMaintenanceFillCostInput instanceof HTMLInputElement) {
+      adminMaintenanceFillCostInput.value =
+        maintenanceContext.maintenanceCost || "";
+    }
+  };
 
-		if (adminReadVehiclePlateNode instanceof HTMLElement) {
-			adminReadVehiclePlateNode.textContent = normalizeReadValue(
-				triggerButton.getAttribute("data-read-vehicle-plate"),
-				vehicleStatus,
-				false
-			);
-		}
+  // maintenance edit/fillup form: populate maintenance edit modal and complete-service form from read modal context.
+  const hydrateMaintenanceEditModal = (triggerButton = null) => {
+    const maintenanceContext = resolveMaintenanceContext(triggerButton);
+    if (!maintenanceContext) {
+      return;
+    }
 
-		updateReadStatusRows(vehicleStatus, details);
+    if (adminMaintenanceEditVehicleIdInput instanceof HTMLInputElement) {
+      adminMaintenanceEditVehicleIdInput.value = String(
+        maintenanceContext.vehicleId || "",
+      );
+    }
 
-		if (adminReadDeleteAction instanceof HTMLElement) {
-			const canDeleteFromReadModal =
-				fleetModeForReadModal === "type" && vehicleStatus === "available";
-			adminReadDeleteAction.hidden = !canDeleteFromReadModal;
-			adminReadDeleteAction.setAttribute("data-delete-vehicle-id", String(vehicleId > 0 ? vehicleId : ""));
-			adminReadDeleteAction.setAttribute("data-delete-vehicle-label", vehicleName);
-			adminReadDeleteAction.setAttribute(
-				"data-delete-fleet-mode",
-				fleetModeForReadModal
-			);
-			adminReadDeleteAction.setAttribute(
-				"data-delete-fleet-type",
-				triggerButton.getAttribute("data-delete-fleet-type") || "cars"
-			);
-			adminReadDeleteAction.setAttribute(
-				"data-delete-fleet-status",
-				triggerButton.getAttribute("data-delete-fleet-status") || "reserved"
-			);
-		}
-	};
+    if (adminMaintenanceEditFleetModeInput instanceof HTMLInputElement) {
+      adminMaintenanceEditFleetModeInput.value =
+        maintenanceContext.fleetMode || "status";
+    }
 
-	// admin fleet delete: populate delete modal fields with the selected vehicle and active fleet filters.
-	const hydrateDeleteVehicleModal = (triggerButton) => {
-		if (!(triggerButton instanceof HTMLElement)) {
-			return;
-		}
+    if (adminMaintenanceEditFleetTypeInput instanceof HTMLInputElement) {
+      adminMaintenanceEditFleetTypeInput.value =
+        maintenanceContext.fleetType || "cars";
+    }
 
-		const vehicleId = Number.parseInt(
-			triggerButton.getAttribute("data-delete-vehicle-id") || "0",
-			10
-		);
-		const vehicleName =
-			triggerButton.getAttribute("data-delete-vehicle-label") ||
-			triggerButton.getAttribute("data-delete-vehicle-name") ||
-			"this vehicle";
-		const fleetMode = triggerButton.getAttribute("data-delete-fleet-mode") || "type";
-		const fleetType = triggerButton.getAttribute("data-delete-fleet-type") || "cars";
-		const fleetStatus =
-			triggerButton.getAttribute("data-delete-fleet-status") || "reserved";
+    if (adminMaintenanceEditFleetStatusInput instanceof HTMLInputElement) {
+      adminMaintenanceEditFleetStatusInput.value =
+        maintenanceContext.fleetStatus || "maintenance";
+    }
 
-		if (adminDeleteVehicleIdInput instanceof HTMLInputElement) {
-			adminDeleteVehicleIdInput.value =
-				Number.isFinite(vehicleId) && vehicleId > 0 ? String(vehicleId) : "";
-		}
+    if (adminMaintenanceEditIssueInput instanceof HTMLInputElement) {
+      adminMaintenanceEditIssueInput.value =
+        maintenanceContext.maintenanceIssueDescription || "";
+    }
 
-		if (adminDeleteVehicleNameNode instanceof HTMLElement) {
-			adminDeleteVehicleNameNode.textContent = vehicleName;
-		}
+    if (adminMaintenanceEditWorkshopInput instanceof HTMLInputElement) {
+      adminMaintenanceEditWorkshopInput.value =
+        maintenanceContext.maintenanceWorkshop || "";
+    }
 
-		if (adminDeleteFleetModeInput instanceof HTMLInputElement) {
-			adminDeleteFleetModeInput.value = fleetMode;
-		}
+    if (adminMaintenanceEditEstimateInput instanceof HTMLInputElement) {
+      adminMaintenanceEditEstimateInput.value = toDateInputValue(
+        maintenanceContext.maintenanceEstimateDatetime || "",
+      );
+    }
 
-		if (adminDeleteFleetTypeInput instanceof HTMLInputElement) {
-			adminDeleteFleetTypeInput.value = fleetType;
-		}
+    if (adminMaintenanceEditCostInput instanceof HTMLInputElement) {
+      adminMaintenanceEditCostInput.value =
+        maintenanceContext.maintenanceCost || "";
+    }
 
-		if (adminDeleteFleetStatusInput instanceof HTMLInputElement) {
-			adminDeleteFleetStatusInput.value = fleetStatus;
-		}
-	};
+    if (adminMaintenanceCompleteVehicleIdInput instanceof HTMLInputElement) {
+      adminMaintenanceCompleteVehicleIdInput.value = String(
+        maintenanceContext.vehicleId || "",
+      );
+    }
 
-	const setModalState = (modal, isOpen) => {
-		modal.hidden = !isOpen;
-		modal.setAttribute("aria-hidden", isOpen ? "false" : "true");
-		modal.classList.toggle("is-open", isOpen);
-	};
+    if (adminMaintenanceCompleteFleetModeInput instanceof HTMLInputElement) {
+      adminMaintenanceCompleteFleetModeInput.value =
+        maintenanceContext.fleetMode || "status";
+    }
 
-	const focusFirstModalControl = (modal) => {
-		window.requestAnimationFrame(() => {
-			const focusTarget =
-				modal.querySelector(".menu-modal__close") || modal.querySelector(".menu-modal__dialog");
-			if (focusTarget instanceof HTMLElement) {
-				focusTarget.focus({ preventScroll: true });
-			}
-		});
-	};
+    if (adminMaintenanceCompleteFleetTypeInput instanceof HTMLInputElement) {
+      adminMaintenanceCompleteFleetTypeInput.value =
+        maintenanceContext.fleetType || "cars";
+    }
 
-	const showModal = (modalId, pushHistory = true) => {
-		const targetModal = modalById.get(modalId);
-		if (!targetModal) {
-			return;
-		}
+    if (adminMaintenanceCompleteFleetStatusInput instanceof HTMLInputElement) {
+      adminMaintenanceCompleteFleetStatusInput.value =
+        maintenanceContext.fleetStatus || "maintenance";
+    }
 
-		const activeModalId = modalHistory.length > 0 ? modalHistory[modalHistory.length - 1] : null;
-		if (activeModalId) {
-			const activeModal = modalById.get(activeModalId);
-			if (activeModal) {
-				setModalState(activeModal, false);
-			}
-		}
+    readModalContext = maintenanceContext;
+  };
 
-		setModalState(targetModal, true);
-		document.body.classList.add("menu-modal-open");
+  const closeCreateCustomSelect = (controller = null) => {
+    const targetController = controller || openCreateCustomSelectController;
+    if (!targetController) {
+      return;
+    }
 
-		if (pushHistory) {
-			modalHistory.push(modalId);
-		}
+    targetController.shell.classList.remove("is-open");
+    targetController.shell.classList.remove("is-drop-up");
+    targetController.list.hidden = true;
+    targetController.list.style.maxHeight = "";
+    targetController.trigger.setAttribute("aria-expanded", "false");
 
-		focusFirstModalControl(targetModal);
-	};
+    if (openCreateCustomSelectController === targetController) {
+      openCreateCustomSelectController = null;
+    }
+  };
 
-	const closeAllModals = () => {
-		modalHistory.length = 0;
-		modalById.forEach((modal) => {
-			setModalState(modal, false);
-		});
-		document.body.classList.remove("menu-modal-open");
-		clearAdminLoginUiState();
+  const updateCreateCustomSelectViewport = (controller) => {
+    if (!controller) {
+      return;
+    }
 
-		if (lastFocusedElement instanceof HTMLElement) {
-			lastFocusedElement.focus({ preventScroll: true });
-		}
-	};
+    const dialog = controller.shell.closest(".menu-modal__dialog");
+    const triggerRect = controller.trigger.getBoundingClientRect();
+    const dialogRect = dialog ? dialog.getBoundingClientRect() : null;
 
-	const goBack = () => {
-		if (modalHistory.length > 1) {
-			const currentModalId = modalHistory.pop();
-			const previousModalId = modalHistory[modalHistory.length - 1];
-			const currentModal = modalById.get(currentModalId);
-			const previousModal = modalById.get(previousModalId);
+    const viewportTop = 0;
+    const viewportBottom = window.innerHeight;
+    const boundaryTop = dialogRect
+      ? Math.max(dialogRect.top, viewportTop)
+      : viewportTop;
+    const boundaryBottom = dialogRect
+      ? Math.min(dialogRect.bottom, viewportBottom)
+      : viewportBottom;
 
-			if (currentModalId === "admin-login-modal") {
-				clearAdminLoginUiState();
-			}
+    const spacing = 10;
+    const preferredMaxHeight = 220;
+    const minimumUsableHeight = 72;
+    const availableBelow = Math.floor(
+      boundaryBottom - triggerRect.bottom - spacing,
+    );
+    const availableAbove = Math.floor(triggerRect.top - boundaryTop - spacing);
+    const shouldOpenUpward =
+      availableBelow < 140 && availableAbove > availableBelow;
 
-			if (currentModal) {
-				setModalState(currentModal, false);
-			}
+    const availableSpace = shouldOpenUpward ? availableAbove : availableBelow;
+    const cappedHeight = Math.max(
+      minimumUsableHeight,
+      Math.min(preferredMaxHeight, availableSpace),
+    );
 
-			if (previousModal) {
-				setModalState(previousModal, true);
-				focusFirstModalControl(previousModal);
-			}
+    controller.shell.classList.toggle("is-drop-up", shouldOpenUpward);
+    controller.list.style.maxHeight = `${cappedHeight}px`;
+  };
 
-			return;
-		}
+  const syncCreateCustomSelect = (controller) => {
+    if (!controller) {
+      return;
+    }
 
-		const hasSafeHistory =
-			window.history.length > 1 &&
-			typeof document.referrer === "string" &&
-			document.referrer.startsWith(window.location.origin);
+    const selectedOption =
+      controller.nativeSelect.options[controller.nativeSelect.selectedIndex] ||
+      controller.nativeSelect.options[0] ||
+      null;
+    const selectedValue = selectedOption ? selectedOption.value : "";
+    const selectedLabel = selectedOption
+      ? String(selectedOption.textContent || "").trim()
+      : "";
 
-		closeAllModals();
+    controller.value.textContent = selectedLabel;
 
-		if (hasSafeHistory) {
-			window.history.back();
-		}
-	};
+    controller.items.forEach((item) => {
+      const isSelected = item.dataset.value === selectedValue;
+      item.classList.toggle("is-selected", isSelected);
+      item.setAttribute("aria-selected", isSelected ? "true" : "false");
+    });
+  };
 
-	menuOpenButtons.forEach((button) => {
-		button.addEventListener("click", () => {
-			lastFocusedElement =
-				document.activeElement instanceof HTMLElement ? document.activeElement : null;
-			modalHistory.length = 0;
-			showModal("menu-modal", true);
-		});
-	});
+  const syncAllCreateCustomSelects = () => {
+    createCustomSelectControllers.forEach((controller) => {
+      syncCreateCustomSelect(controller);
+    });
+  };
 
-	targetButtons.forEach((button) => {
-		button.addEventListener("click", () => {
-			const targetId = button.getAttribute("data-modal-target");
-			if (!targetId) {
-				return;
-			}
+  const initCreateCustomSelects = () => {
+    if (adminCreateSelectInputs.length === 0) {
+      return;
+    }
 
-			if (targetId === "admin-vehicle-read-modal") {
-				hydrateReadVehicleModal(button);
-			}
+    adminCreateSelectInputs.forEach((nativeSelect) => {
+      if (
+        !(nativeSelect instanceof HTMLSelectElement) ||
+        nativeSelect.dataset.customSelectReady === "true"
+      ) {
+        return;
+      }
 
-			if (targetId === "admin-delete-vehicle-modal") {
-				hydrateDeleteVehicleModal(button);
-			}
+      nativeSelect.dataset.customSelectReady = "true";
+      nativeSelect.classList.add("admin-create-vehicle-modal__native-select");
 
-			if (modalHistory.length === 0) {
-				lastFocusedElement =
-					document.activeElement instanceof HTMLElement ? document.activeElement : null;
-			}
+      const shell = document.createElement("div");
+      shell.className = "admin-create-vehicle-modal__select-shell";
 
-			showModal(targetId, true);
-		});
-	});
+      const trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = "admin-create-vehicle-modal__select-control";
+      trigger.setAttribute("aria-haspopup", "listbox");
+      trigger.setAttribute("aria-expanded", "false");
 
-	closeButtons.forEach((button) => {
-		button.addEventListener("click", closeAllModals);
-	});
+      const value = document.createElement("span");
+      value.className = "admin-create-vehicle-modal__select-value";
 
-	backButtons.forEach((button) => {
-		button.addEventListener("click", goBack);
-	});
+      const icon = document.createElement("span");
+      icon.className =
+        "material-symbols-rounded admin-create-vehicle-modal__select-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "expand_more";
 
-	navigationLinks.forEach((link) => {
-		link.addEventListener("click", () => {
-			closeAllModals();
-		});
-	});
+      trigger.append(value, icon);
 
-	passwordToggleButtons.forEach((button) => {
-		button.addEventListener("click", () => {
-			const targetId = button.getAttribute("data-password-target");
-			if (!targetId) {
-				return;
-			}
+      const list = document.createElement("ul");
+      list.className = "admin-create-vehicle-modal__select-options";
+      list.setAttribute("role", "listbox");
+      list.hidden = true;
 
-			const targetInput = document.getElementById(targetId);
-			if (!(targetInput instanceof HTMLInputElement)) {
-				return;
-			}
+      const controller = {
+        nativeSelect,
+        shell,
+        trigger,
+        value,
+        list,
+        items: [],
+      };
 
-			const shouldShow = targetInput.type === "password";
-			targetInput.type = shouldShow ? "text" : "password";
-			button.setAttribute("aria-label", shouldShow ? "Hide password" : "Show password");
+      Array.from(nativeSelect.options).forEach((option) => {
+        const optionItem = document.createElement("li");
 
-			const icon = button.querySelector(".material-symbols-rounded");
-			if (icon) {
-				icon.textContent = shouldShow ? "visibility_off" : "visibility";
-			}
-		});
-	});
+        const optionButton = document.createElement("button");
+        optionButton.type = "button";
+        optionButton.className = "admin-create-vehicle-modal__select-option";
+        optionButton.dataset.value = option.value;
+        optionButton.setAttribute("role", "option");
+        optionButton.textContent = String(option.textContent || option.value);
 
-	document.addEventListener("click", (event) => {
-		const target = event.target;
-		if (!(target instanceof HTMLElement)) {
-			return;
-		}
+        optionButton.addEventListener("click", () => {
+          nativeSelect.value = option.value;
+          nativeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+          syncCreateCustomSelect(controller);
+          closeCreateCustomSelect(controller);
+        });
 
-		if (target.classList.contains("menu-modal__overlay")) {
-			closeAllModals();
-		}
-	});
+        optionItem.appendChild(optionButton);
+        list.appendChild(optionItem);
+        controller.items.push(optionButton);
+      });
 
-	document.addEventListener("keydown", (event) => {
-		if (event.key === "Escape") {
-			closeAllModals();
-		}
-	});
+      trigger.addEventListener("click", () => {
+        const isOpen = shell.classList.contains("is-open");
+        if (isOpen) {
+          closeCreateCustomSelect(controller);
+          return;
+        }
 
-	const autoOpenAdminModal = document.getElementById("admin-login-modal")?.getAttribute("data-open-on-load") === "true";
-	if (autoOpenAdminModal) {
-		modalHistory.length = 0;
-		showModal("menu-modal", true);
-		showModal("admin-login-modal", true);
-	} else {
-		clearAdminLoginUiState();
-	}
+        if (openCreateCustomSelectController) {
+          closeCreateCustomSelect(openCreateCustomSelectController);
+        }
 
-	window.addEventListener("pageshow", () => {
-		if (!autoOpenAdminModal) {
-			clearAdminLoginUiState();
-		}
-	});
+        shell.classList.add("is-open");
+        list.hidden = false;
+        updateCreateCustomSelectViewport(controller);
+        trigger.setAttribute("aria-expanded", "true");
+        openCreateCustomSelectController = controller;
+      });
+
+      nativeSelect.addEventListener("change", () => {
+        syncCreateCustomSelect(controller);
+      });
+
+      shell.append(trigger, list);
+      nativeSelect.insertAdjacentElement("afterend", shell);
+
+      createCustomSelectControllers.push(controller);
+      syncCreateCustomSelect(controller);
+    });
+  };
+
+  // create vehicle modal: manage 3-step navigation, step validation, and file-label hydration.
+  const getCreateVehicleStepTitle = (step) =>
+    step <= 1 ? "Create Vehicle" : `Create Vehicle Part ${step}`;
+
+  const getCreateVehicleStepPanel = (step) => {
+    if (adminCreateStepPanels.length === 0) {
+      return null;
+    }
+
+    return (
+      adminCreateStepPanels.find((panel) => {
+        const panelStep = Number.parseInt(
+          panel.getAttribute("data-create-step-panel") || "0",
+          10,
+        );
+        return panelStep === step;
+      }) || null
+    );
+  };
+
+  const setCreateVehicleStep = (requestedStep) => {
+    if (adminCreateStepPanels.length === 0) {
+      return;
+    }
+
+    const boundedStep = Math.min(
+      Math.max(Number.parseInt(String(requestedStep), 10) || 1, 1),
+      adminCreateStepPanels.length,
+    );
+
+    createVehicleStep = boundedStep;
+
+    adminCreateStepPanels.forEach((panel) => {
+      const panelStep = Number.parseInt(
+        panel.getAttribute("data-create-step-panel") || "0",
+        10,
+      );
+      const isActive = panelStep === boundedStep;
+      panel.hidden = !isActive;
+      panel.classList.toggle("is-active", isActive);
+    });
+
+    if (adminCreateStepLabel instanceof HTMLElement) {
+      adminCreateStepLabel.textContent = getCreateVehicleStepTitle(boundedStep);
+    }
+  };
+
+  const validateCreateVehicleStep = (step) => {
+    const panel = getCreateVehicleStepPanel(step);
+    if (!(panel instanceof HTMLElement)) {
+      return true;
+    }
+
+    const requiredControls = Array.from(
+      panel.querySelectorAll(
+        "input[required], select[required], textarea[required]",
+      ),
+    );
+
+    for (const control of requiredControls) {
+      if (
+        control instanceof HTMLInputElement &&
+        control.type === "file" &&
+        control.required &&
+        control.files &&
+        control.files.length === 0
+      ) {
+        control.reportValidity();
+        return false;
+      }
+
+      if (
+        typeof control.checkValidity === "function" &&
+        !control.checkValidity()
+      ) {
+        control.reportValidity();
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const updateCreateImageUi = () => {
+    const imageName =
+      adminCreateImageInput instanceof HTMLInputElement &&
+      adminCreateImageInput.files &&
+      adminCreateImageInput.files.length > 0
+        ? adminCreateImageInput.files[0].name
+        : "";
+
+    if (adminCreateImageNameInput instanceof HTMLInputElement) {
+      adminCreateImageNameInput.value = imageName;
+    }
+
+    if (adminCreateImageClearButton instanceof HTMLElement) {
+      adminCreateImageClearButton.hidden = imageName === "";
+    }
+  };
+
+  const resetCreateVehicleModal = () => {
+    closeCreateCustomSelect();
+
+    if (adminCreateVehicleForm instanceof HTMLFormElement) {
+      adminCreateVehicleForm.reset();
+    }
+
+    if (adminCreateFleetModeInput instanceof HTMLInputElement) {
+      adminCreateFleetModeInput.value = "type";
+    }
+
+    if (adminCreateFleetTypeInput instanceof HTMLInputElement) {
+      adminCreateFleetTypeInput.value = "cars";
+    }
+
+    if (adminCreateVehicleTypeInput instanceof HTMLSelectElement) {
+      adminCreateVehicleTypeInput.value = "cars";
+    }
+
+    syncAllCreateCustomSelects();
+    setCreateVehicleStep(1);
+    updateCreateImageUi();
+  };
+
+  const hydrateCreateVehicleModal = (triggerButton) => {
+    resetCreateVehicleModal();
+
+    if (!(triggerButton instanceof HTMLElement)) {
+      return;
+    }
+
+    const fleetMode =
+      triggerButton.getAttribute("data-create-fleet-mode") || "type";
+    const fleetType =
+      triggerButton.getAttribute("data-create-fleet-type") || "cars";
+    const vehicleType =
+      triggerButton.getAttribute("data-create-vehicle-type") || fleetType;
+
+    if (adminCreateFleetModeInput instanceof HTMLInputElement) {
+      adminCreateFleetModeInput.value = fleetMode;
+    }
+
+    if (adminCreateFleetTypeInput instanceof HTMLInputElement) {
+      adminCreateFleetTypeInput.value = fleetType;
+    }
+
+    if (adminCreateVehicleTypeInput instanceof HTMLSelectElement) {
+      adminCreateVehicleTypeInput.value = vehicleType;
+      if (adminCreateFleetTypeInput instanceof HTMLInputElement) {
+        adminCreateFleetTypeInput.value = vehicleType;
+      }
+    }
+
+    syncAllCreateCustomSelects();
+  };
+
+  // edit vehicle modal: resolve trigger context, hydrate 3-step form state, and keep image/select UI in sync.
+  const getFileNameFromPath = (rawPath) => {
+    const normalized = String(rawPath || "").trim();
+    if (normalized === "") {
+      return "";
+    }
+
+    const segments = normalized.split(/[\\/]+/);
+    return segments.length > 0 ? segments[segments.length - 1] : normalized;
+  };
+
+  const normalizeEditVehicleStatus = (rawStatus) => {
+    const normalized = String(rawStatus || "available")
+      .trim()
+      .toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(readStatusLabels, normalized)) {
+      return normalized;
+    }
+
+    return "available";
+  };
+
+  const resolveEditVehicleContext = (triggerButton = null) => {
+    if (triggerButton instanceof HTMLElement) {
+      const triggerVehicleId = Number.parseInt(
+        triggerButton.getAttribute("data-edit-vehicle-id") ||
+          triggerButton.getAttribute("data-read-vehicle-id") ||
+          "0",
+        10,
+      );
+      const triggerFullName =
+        triggerButton.getAttribute("data-edit-vehicle-full-name") ||
+        triggerButton.getAttribute("data-read-vehicle-full-name") ||
+        "";
+      const triggerShortName =
+        triggerButton.getAttribute("data-edit-vehicle-short-name") ||
+        triggerButton.getAttribute("data-read-vehicle-name") ||
+        "";
+      const triggerLicense =
+        triggerButton.getAttribute("data-edit-vehicle-license") ||
+        triggerButton.getAttribute("data-edit-vehicle-license-plate") ||
+        triggerButton.getAttribute("data-read-vehicle-plate") ||
+        "";
+
+      if (
+        triggerVehicleId > 0 ||
+        triggerFullName ||
+        triggerShortName ||
+        triggerLicense
+      ) {
+        return {
+          vehicleId: triggerVehicleId,
+          vehicleStatus: normalizeEditVehicleStatus(
+            triggerButton.getAttribute("data-edit-vehicle-status") ||
+              triggerButton.getAttribute("data-read-vehicle-status") ||
+              "available",
+          ),
+          fleetMode:
+            triggerButton.getAttribute("data-delete-fleet-mode") || "type",
+          fleetType:
+            triggerButton.getAttribute("data-delete-fleet-type") || "cars",
+          fleetStatus:
+            triggerButton.getAttribute("data-delete-fleet-status") ||
+            "available",
+          vehicleType:
+            triggerButton.getAttribute("data-edit-vehicle-type") ||
+            triggerButton.getAttribute("data-read-vehicle-type") ||
+            "cars",
+          vehicleFullName: triggerFullName,
+          vehicleShortName: triggerShortName,
+          vehiclePricePerDay:
+            triggerButton.getAttribute("data-edit-vehicle-price") ||
+            triggerButton.getAttribute("data-read-vehicle-price") ||
+            "",
+          vehicleDriverAge:
+            triggerButton.getAttribute("data-edit-vehicle-driver-age") ||
+            triggerButton.getAttribute("data-read-vehicle-age") ||
+            "",
+          vehicleSeats:
+            triggerButton.getAttribute("data-edit-vehicle-seats") ||
+            triggerButton.getAttribute("data-read-vehicle-seats") ||
+            "",
+          vehicleTransmission:
+            triggerButton.getAttribute("data-edit-vehicle-transmission") ||
+            triggerButton.getAttribute("data-read-vehicle-transmission") ||
+            "manual",
+          vehicleFuel:
+            triggerButton.getAttribute("data-edit-vehicle-fuel") ||
+            triggerButton.getAttribute("data-read-vehicle-fuel") ||
+            "petrol",
+          vehicleLicensePlate: triggerLicense,
+          vehicleGpsId:
+            triggerButton.getAttribute("data-edit-vehicle-gps-id") ||
+            triggerButton.getAttribute("data-read-vehicle-gps-id") ||
+            "",
+          vehicleLastServiceDate:
+            triggerButton.getAttribute("data-edit-vehicle-last-service") ||
+            triggerButton.getAttribute("data-read-vehicle-last-service") ||
+            "",
+          vehicleDescription:
+            triggerButton.getAttribute("data-edit-vehicle-description") ||
+            triggerButton.getAttribute("data-read-vehicle-description") ||
+            "",
+          vehicleImagePath:
+            triggerButton.getAttribute("data-edit-vehicle-image") ||
+            triggerButton.getAttribute("data-read-vehicle-image") ||
+            "",
+        };
+      }
+    }
+
+    return readModalContext;
+  };
+
+  const getEditVehicleStepPanel = (step) => {
+    if (adminEditStepPanels.length === 0) {
+      return null;
+    }
+
+    return (
+      adminEditStepPanels.find((panel) => {
+        const panelStep = Number.parseInt(
+          panel.getAttribute("data-edit-step-panel") || "0",
+          10,
+        );
+        return panelStep === step;
+      }) || null
+    );
+  };
+
+  const setEditVehicleStep = (requestedStep) => {
+    if (adminEditStepPanels.length === 0) {
+      return;
+    }
+
+    const boundedStep = Math.min(
+      Math.max(Number.parseInt(String(requestedStep), 10) || 1, 1),
+      adminEditStepPanels.length,
+    );
+
+    editVehicleStep = boundedStep;
+
+    adminEditStepPanels.forEach((panel) => {
+      const panelStep = Number.parseInt(
+        panel.getAttribute("data-edit-step-panel") || "0",
+        10,
+      );
+      const isActive = panelStep === boundedStep;
+      panel.hidden = !isActive;
+      panel.classList.toggle("is-active", isActive);
+    });
+  };
+
+  const validateEditVehicleStep = (step) => {
+    const panel = getEditVehicleStepPanel(step);
+    if (!(panel instanceof HTMLElement)) {
+      return true;
+    }
+
+    const requiredControls = Array.from(
+      panel.querySelectorAll(
+        "input[required], select[required], textarea[required]",
+      ),
+    );
+
+    for (const control of requiredControls) {
+      if (
+        typeof control.checkValidity === "function" &&
+        !control.checkValidity()
+      ) {
+        control.reportValidity();
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const updateEditImageUi = () => {
+    const selectedImageName =
+      adminEditImageInput instanceof HTMLInputElement &&
+      adminEditImageInput.files &&
+      adminEditImageInput.files.length > 0
+        ? adminEditImageInput.files[0].name
+        : "";
+    const currentImageName = getFileNameFromPath(
+      adminEditCurrentImagePathInput instanceof HTMLInputElement
+        ? adminEditCurrentImagePathInput.value
+        : "",
+    );
+
+    if (adminEditImageNameInput instanceof HTMLInputElement) {
+      adminEditImageNameInput.value =
+        selectedImageName || currentImageName || "Keep current image";
+    }
+
+    if (adminEditImageClearButton instanceof HTMLElement) {
+      adminEditImageClearButton.hidden = selectedImageName === "";
+    }
+  };
+
+  const resetEditVehicleModal = () => {
+    closeCreateCustomSelect();
+
+    if (adminEditVehicleForm instanceof HTMLFormElement) {
+      adminEditVehicleForm.reset();
+    }
+
+    if (adminEditCurrentImagePathInput instanceof HTMLInputElement) {
+      adminEditCurrentImagePathInput.value = "";
+    }
+
+    if (adminEditFleetModeInput instanceof HTMLInputElement) {
+      adminEditFleetModeInput.value = "type";
+    }
+
+    if (adminEditFleetTypeInput instanceof HTMLInputElement) {
+      adminEditFleetTypeInput.value = "cars";
+    }
+
+    if (adminEditFleetStatusInput instanceof HTMLInputElement) {
+      adminEditFleetStatusInput.value = "available";
+    }
+
+    if (adminEditVehicleTypeInput instanceof HTMLSelectElement) {
+      adminEditVehicleTypeInput.value = "cars";
+    }
+
+    if (adminEditDriverAgeInput instanceof HTMLSelectElement) {
+      adminEditDriverAgeInput.value = "18";
+    }
+
+    if (adminEditStatusInput instanceof HTMLSelectElement) {
+      adminEditStatusInput.value = "available";
+    }
+
+    if (adminEditImageInput instanceof HTMLInputElement) {
+      adminEditImageInput.value = "";
+    }
+
+    syncAllCreateCustomSelects();
+    setEditVehicleStep(1);
+    updateEditImageUi();
+  };
+
+  const hydrateEditVehicleModal = (triggerButton = null) => {
+    const editContext = resolveEditVehicleContext(triggerButton);
+    if (!editContext) {
+      return;
+    }
+
+    resetEditVehicleModal();
+
+    const normalizedVehicleType =
+      String(editContext.vehicleType || "cars").toLowerCase() || "cars";
+    const normalizedVehicleStatus = normalizeEditVehicleStatus(
+      editContext.vehicleStatus,
+    );
+    const normalizedDriverAge = String(
+      editContext.vehicleDriverAge || "18",
+    ).trim();
+    const sanitizedDriverAge =
+      normalizedDriverAge === "21" || normalizedDriverAge === "18"
+        ? normalizedDriverAge
+        : "18";
+
+    if (adminEditVehicleIdInput instanceof HTMLInputElement) {
+      adminEditVehicleIdInput.value = String(editContext.vehicleId || "");
+    }
+
+    if (adminEditFleetModeInput instanceof HTMLInputElement) {
+      adminEditFleetModeInput.value = editContext.fleetMode || "type";
+    }
+
+    if (adminEditFleetTypeInput instanceof HTMLInputElement) {
+      adminEditFleetTypeInput.value = editContext.fleetType || "cars";
+    }
+
+    if (adminEditFleetStatusInput instanceof HTMLInputElement) {
+      adminEditFleetStatusInput.value =
+        editContext.fleetStatus || normalizedVehicleStatus;
+    }
+
+    if (adminEditVehicleTypeInput instanceof HTMLSelectElement) {
+      adminEditVehicleTypeInput.value = normalizedVehicleType;
+      if (adminEditFleetTypeInput instanceof HTMLInputElement) {
+        adminEditFleetTypeInput.value = normalizedVehicleType;
+      }
+    }
+
+    if (adminEditFullNameInput instanceof HTMLInputElement) {
+      adminEditFullNameInput.value = editContext.vehicleFullName || "";
+    }
+
+    if (adminEditShortNameInput instanceof HTMLInputElement) {
+      adminEditShortNameInput.value = editContext.vehicleShortName || "";
+    }
+
+    if (adminEditPriceInput instanceof HTMLInputElement) {
+      adminEditPriceInput.value = editContext.vehiclePricePerDay || "";
+    }
+
+    if (adminEditDriverAgeInput instanceof HTMLSelectElement) {
+      adminEditDriverAgeInput.value = sanitizedDriverAge;
+    }
+
+    if (adminEditSeatsInput instanceof HTMLInputElement) {
+      adminEditSeatsInput.value = editContext.vehicleSeats || "";
+    }
+
+    if (adminEditTransmissionInput instanceof HTMLSelectElement) {
+      adminEditTransmissionInput.value =
+        editContext.vehicleTransmission || "manual";
+    }
+
+    if (adminEditFuelInput instanceof HTMLSelectElement) {
+      adminEditFuelInput.value = editContext.vehicleFuel || "petrol";
+    }
+
+    if (adminEditLicenseInput instanceof HTMLInputElement) {
+      adminEditLicenseInput.value = editContext.vehicleLicensePlate || "";
+    }
+
+    if (adminEditGpsInput instanceof HTMLInputElement) {
+      adminEditGpsInput.value = editContext.vehicleGpsId || "";
+    }
+
+    if (adminEditStatusInput instanceof HTMLSelectElement) {
+      adminEditStatusInput.value = normalizedVehicleStatus;
+    }
+
+    if (adminEditLastServiceInput instanceof HTMLInputElement) {
+      adminEditLastServiceInput.value = toDateInputValue(
+        editContext.vehicleLastServiceDate || "",
+      );
+    }
+
+    if (adminEditDescriptionInput instanceof HTMLTextAreaElement) {
+      adminEditDescriptionInput.value = editContext.vehicleDescription || "";
+    }
+
+    if (adminEditCurrentImagePathInput instanceof HTMLInputElement) {
+      adminEditCurrentImagePathInput.value = editContext.vehicleImagePath || "";
+    }
+
+    if (adminEditImageInput instanceof HTMLInputElement) {
+      adminEditImageInput.value = "";
+    }
+
+    syncAllCreateCustomSelects();
+    setEditVehicleStep(1);
+    updateEditImageUi();
+
+    readModalContext = {
+      ...(readModalContext && typeof readModalContext === "object"
+        ? readModalContext
+        : {}),
+      ...editContext,
+      vehicleStatus: normalizedVehicleStatus,
+      vehicleType: normalizedVehicleType,
+    };
+  };
+
+  initCreateCustomSelects();
+
+  if (adminReadEditAction instanceof HTMLElement) {
+    adminReadEditAction.addEventListener("click", () => {
+      const maintenanceContext = resolveMaintenanceContext(adminReadEditAction);
+      const editContext = resolveEditVehicleContext(adminReadEditAction);
+
+      if (!maintenanceContext && !editContext) {
+        return;
+      }
+
+      if (maintenanceContext) {
+        readModalContext = maintenanceContext;
+      }
+
+      const targetId =
+        maintenanceContext?.vehicleStatus === "maintenance"
+          ? "admin-maintenance-edit-modal"
+          : "admin-edit-vehicle-modal";
+
+      if (targetId === "admin-maintenance-edit-modal") {
+        hydrateMaintenanceEditModal(adminReadEditAction);
+      } else {
+        hydrateEditVehicleModal(adminReadEditAction);
+      }
+
+      if (modalHistory.length === 0) {
+        lastFocusedElement =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+      }
+
+      showModal(targetId, true);
+    });
+  }
+
+  const hydrateReadVehicleModal = (triggerButton) => {
+    if (!(triggerButton instanceof HTMLElement)) {
+      return;
+    }
+
+    const vehicleId = Number.parseInt(
+      triggerButton.getAttribute("data-read-vehicle-id") || "0",
+      10,
+    );
+    const vehicleName =
+      triggerButton.getAttribute("data-read-vehicle-name") || "Vehicle";
+    const vehicleFullName =
+      triggerButton.getAttribute("data-read-vehicle-full-name") || vehicleName;
+    const vehicleTypeRaw = (
+      triggerButton.getAttribute("data-read-vehicle-type") || "cars"
+    ).toLowerCase();
+    const vehicleStatusRaw = (
+      triggerButton.getAttribute("data-read-vehicle-status") || "available"
+    ).toLowerCase();
+    const vehicleStatus = Object.prototype.hasOwnProperty.call(
+      readStatusLabels,
+      vehicleStatusRaw,
+    )
+      ? vehicleStatusRaw
+      : "available";
+    const vehicleImagePath =
+      triggerButton.getAttribute("data-read-vehicle-image") ||
+      "images/vehicle-feature.png";
+    const vehiclePricePerDay =
+      triggerButton.getAttribute("data-read-vehicle-price") || "";
+    const vehicleDriverAge =
+      triggerButton.getAttribute("data-read-vehicle-age") || "";
+    const vehicleSeats =
+      triggerButton.getAttribute("data-read-vehicle-seats") || "";
+    const vehicleTransmission =
+      triggerButton.getAttribute("data-read-vehicle-transmission") || "";
+    const vehicleFuel =
+      triggerButton.getAttribute("data-read-vehicle-fuel") || "";
+    const vehicleLicensePlate =
+      triggerButton.getAttribute("data-read-vehicle-plate") || "";
+    const vehicleGpsId =
+      triggerButton.getAttribute("data-read-vehicle-gps-id") || "";
+    const vehicleLastServiceDate =
+      triggerButton.getAttribute("data-read-vehicle-last-service") || "";
+    const vehicleDescription =
+      triggerButton.getAttribute("data-read-vehicle-description") || "";
+    const fleetModeForReadModal =
+      triggerButton.getAttribute("data-delete-fleet-mode") || "type";
+
+    const bookingNumber =
+      triggerButton.getAttribute("data-read-booking-number") || "";
+    const bookingUserName =
+      triggerButton.getAttribute("data-read-booking-user-name") || "";
+    const bookingUserPhone =
+      triggerButton.getAttribute("data-read-booking-user-phone") || "";
+    const pickupDatetime =
+      triggerButton.getAttribute("data-read-booking-pickup") || "";
+    const returnDatetime =
+      triggerButton.getAttribute("data-read-booking-return") || "";
+    const paymentStatus =
+      triggerButton.getAttribute("data-read-booking-payment-status") || "";
+    const lateFee =
+      triggerButton.getAttribute("data-read-booking-late-fee") || "";
+    const latitude = triggerButton.getAttribute("data-read-gps-latitude") || "";
+    const longitude =
+      triggerButton.getAttribute("data-read-gps-longitude") || "";
+    const currentLocation =
+      latitude !== "" && longitude !== "" ? `${latitude}, ${longitude}` : "";
+
+    const details = {
+      lastServiceDate: vehicleLastServiceDate,
+      description: vehicleDescription,
+      maintenanceIssueDescription:
+        triggerButton.getAttribute("data-read-maintenance-issue") || "",
+      maintenanceWorkshop:
+        triggerButton.getAttribute("data-read-maintenance-workshop") || "",
+      maintenanceEstimateDatetime:
+        triggerButton.getAttribute("data-read-maintenance-estimate") || "",
+      maintenanceCost:
+        triggerButton.getAttribute("data-read-maintenance-cost") || "",
+      upcomingPickupDatetime:
+        triggerButton.getAttribute("data-read-upcoming-pickup") || "",
+      totalReservations:
+        triggerButton.getAttribute("data-read-total-reservations") || "0",
+      totalEarnings:
+        triggerButton.getAttribute("data-read-total-earnings") || "0",
+      pickupDatetime,
+      returnDatetime,
+      paymentStatus,
+      lateFee,
+      currentLocation,
+    };
+
+    const isUserStatus = readUserStatuses.includes(vehicleStatus);
+
+    if (adminReadBookingNumberNode instanceof HTMLElement) {
+      adminReadBookingNumberNode.textContent = isUserStatus
+        ? normalizeReadValue(bookingNumber, vehicleStatus, true)
+        : readUserNotApplicableText;
+    }
+
+    if (
+      adminReadCurrentUserLine instanceof HTMLElement &&
+      adminReadCurrentUserNode instanceof HTMLElement
+    ) {
+      adminReadCurrentUserLine.hidden = !isUserStatus;
+
+      if (!isUserStatus) {
+        adminReadCurrentUserNode.textContent = "";
+      } else {
+        const hasFullUserDetails =
+          !isReadValueMissing(bookingUserName) &&
+          !isReadValueMissing(bookingUserPhone);
+        adminReadCurrentUserNode.textContent = hasFullUserDetails
+          ? `${String(bookingUserName).trim()} ${String(bookingUserPhone).trim()}`
+          : readUnavailableText;
+      }
+    }
+
+    if (adminReadStatusPill instanceof HTMLElement) {
+      adminReadStatusPill.textContent =
+        readStatusLabels[vehicleStatus] || "Available";
+      adminReadStatusPill.className = `admin-vehicle-read-modal__status-pill admin-vehicle-read-modal__status-pill--${vehicleStatus.replace("_", "-")}`;
+    }
+
+    if (adminReadMaintenanceIndicator instanceof HTMLElement) {
+      const showMaintenanceIndicator =
+        fleetModeForReadModal === "type" && vehicleStatus === "available";
+      adminReadMaintenanceIndicator.hidden = !showMaintenanceIndicator;
+    }
+
+    if (adminReadEditAction instanceof HTMLButtonElement) {
+      const canEditMaintenance = vehicleStatus === "maintenance";
+      adminReadEditAction.hidden = !(
+        fleetModeForReadModal === "type" || canEditMaintenance
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-id",
+        String(vehicleId > 0 ? vehicleId : ""),
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-type",
+        vehicleTypeRaw || "cars",
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-full-name",
+        vehicleFullName,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-short-name",
+        vehicleName,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-price",
+        vehiclePricePerDay,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-driver-age",
+        vehicleDriverAge,
+      );
+      adminReadEditAction.setAttribute("data-edit-vehicle-seats", vehicleSeats);
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-transmission",
+        vehicleTransmission,
+      );
+      adminReadEditAction.setAttribute("data-edit-vehicle-fuel", vehicleFuel);
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-license",
+        vehicleLicensePlate,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-license-plate",
+        vehicleLicensePlate,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-gps-id",
+        vehicleGpsId,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-status",
+        vehicleStatus,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-last-service",
+        vehicleLastServiceDate,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-description",
+        vehicleDescription,
+      );
+      adminReadEditAction.setAttribute(
+        "data-edit-vehicle-image",
+        vehicleImagePath,
+      );
+      adminReadEditAction.setAttribute(
+        "data-delete-fleet-mode",
+        fleetModeForReadModal,
+      );
+      adminReadEditAction.setAttribute(
+        "data-delete-fleet-type",
+        triggerButton.getAttribute("data-delete-fleet-type") || "cars",
+      );
+      adminReadEditAction.setAttribute(
+        "data-delete-fleet-status",
+        triggerButton.getAttribute("data-delete-fleet-status") || vehicleStatus,
+      );
+    }
+
+    if (adminReadVehicleImage instanceof HTMLImageElement) {
+      adminReadVehicleImage.src = vehicleImagePath;
+      adminReadVehicleImage.alt = vehicleName;
+    }
+
+    if (adminReadVehicleTypeNode instanceof HTMLElement) {
+      adminReadVehicleTypeNode.textContent = toTitleCase(
+        vehicleTypeRaw.replace(/s$/, ""),
+      );
+    }
+
+    if (adminReadVehicleFullNameNode instanceof HTMLElement) {
+      adminReadVehicleFullNameNode.textContent = vehicleFullName;
+    }
+
+    if (adminReadVehicleSeatsNode instanceof HTMLElement) {
+      const seatsValue = normalizeReadValue(vehicleSeats, vehicleStatus, false);
+      adminReadVehicleSeatsNode.textContent =
+        seatsValue === readUnavailableText
+          ? readUnavailableText
+          : `${seatsValue} Seats`;
+    }
+
+    if (adminReadVehicleTransmissionNode instanceof HTMLElement) {
+      adminReadVehicleTransmissionNode.textContent = toTitleCase(
+        normalizeReadValue(vehicleTransmission, vehicleStatus, false),
+      );
+    }
+
+    if (adminReadVehicleAgeNode instanceof HTMLElement) {
+      const ageValue = normalizeReadValue(
+        vehicleDriverAge,
+        vehicleStatus,
+        false,
+      );
+      adminReadVehicleAgeNode.textContent =
+        ageValue === readUnavailableText
+          ? readUnavailableText
+          : `${ageValue}+ Years`;
+    }
+
+    if (adminReadVehicleFuelNode instanceof HTMLElement) {
+      adminReadVehicleFuelNode.textContent = toTitleCase(
+        normalizeReadValue(vehicleFuel, vehicleStatus, false),
+      );
+    }
+
+    if (adminReadVehiclePlateNode instanceof HTMLElement) {
+      adminReadVehiclePlateNode.textContent = normalizeReadValue(
+        vehicleLicensePlate,
+        vehicleStatus,
+        false,
+      );
+    }
+
+    updateReadStatusRows(vehicleStatus, details);
+
+    if (adminReadDeleteAction instanceof HTMLElement) {
+      const canDeleteFromReadModal =
+        fleetModeForReadModal === "type" && vehicleStatus === "available";
+      adminReadDeleteAction.hidden = !canDeleteFromReadModal;
+      adminReadDeleteAction.setAttribute(
+        "data-delete-vehicle-id",
+        String(vehicleId > 0 ? vehicleId : ""),
+      );
+      adminReadDeleteAction.setAttribute(
+        "data-delete-vehicle-label",
+        vehicleName,
+      );
+      adminReadDeleteAction.setAttribute(
+        "data-delete-fleet-mode",
+        fleetModeForReadModal,
+      );
+      adminReadDeleteAction.setAttribute(
+        "data-delete-fleet-type",
+        triggerButton.getAttribute("data-delete-fleet-type") || "cars",
+      );
+      adminReadDeleteAction.setAttribute(
+        "data-delete-fleet-status",
+        triggerButton.getAttribute("data-delete-fleet-status") || "reserved",
+      );
+    }
+
+    readModalContext = {
+      vehicleId,
+      vehicleStatus,
+      fleetMode: fleetModeForReadModal,
+      fleetType: triggerButton.getAttribute("data-delete-fleet-type") || "cars",
+      fleetStatus:
+        triggerButton.getAttribute("data-delete-fleet-status") || "maintenance",
+      vehicleType: vehicleTypeRaw,
+      vehicleFullName,
+      vehicleShortName: vehicleName,
+      vehiclePricePerDay,
+      vehicleDriverAge,
+      vehicleSeats,
+      vehicleTransmission,
+      vehicleFuel,
+      vehicleLicensePlate,
+      vehicleGpsId,
+      vehicleLastServiceDate,
+      vehicleDescription,
+      vehicleImagePath,
+      maintenanceIssueDescription: details.maintenanceIssueDescription,
+      maintenanceWorkshop: details.maintenanceWorkshop,
+      maintenanceEstimateDatetime: details.maintenanceEstimateDatetime,
+      maintenanceCost: details.maintenanceCost,
+    };
+  };
+
+  // admin fleet delete: populate delete modal fields with the selected vehicle and active fleet filters.
+  const hydrateDeleteVehicleModal = (triggerButton) => {
+    if (!(triggerButton instanceof HTMLElement)) {
+      return;
+    }
+
+    const vehicleId = Number.parseInt(
+      triggerButton.getAttribute("data-delete-vehicle-id") || "0",
+      10,
+    );
+    const vehicleName =
+      triggerButton.getAttribute("data-delete-vehicle-label") ||
+      triggerButton.getAttribute("data-delete-vehicle-name") ||
+      "this vehicle";
+    const fleetMode =
+      triggerButton.getAttribute("data-delete-fleet-mode") || "type";
+    const fleetType =
+      triggerButton.getAttribute("data-delete-fleet-type") || "cars";
+    const fleetStatus =
+      triggerButton.getAttribute("data-delete-fleet-status") || "reserved";
+
+    if (adminDeleteVehicleIdInput instanceof HTMLInputElement) {
+      adminDeleteVehicleIdInput.value =
+        Number.isFinite(vehicleId) && vehicleId > 0 ? String(vehicleId) : "";
+    }
+
+    if (adminDeleteVehicleNameNode instanceof HTMLElement) {
+      adminDeleteVehicleNameNode.textContent = vehicleName;
+    }
+
+    if (adminDeleteFleetModeInput instanceof HTMLInputElement) {
+      adminDeleteFleetModeInput.value = fleetMode;
+    }
+
+    if (adminDeleteFleetTypeInput instanceof HTMLInputElement) {
+      adminDeleteFleetTypeInput.value = fleetType;
+    }
+
+    if (adminDeleteFleetStatusInput instanceof HTMLInputElement) {
+      adminDeleteFleetStatusInput.value = fleetStatus;
+    }
+  };
+
+  const setModalState = (modal, isOpen) => {
+    modal.hidden = !isOpen;
+    modal.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    modal.classList.toggle("is-open", isOpen);
+  };
+
+  const focusFirstModalControl = (modal) => {
+    window.requestAnimationFrame(() => {
+      const focusTarget =
+        modal.querySelector(".menu-modal__close") ||
+        modal.querySelector(".menu-modal__dialog");
+      if (focusTarget instanceof HTMLElement) {
+        focusTarget.focus({ preventScroll: true });
+      }
+    });
+  };
+
+  const showModal = (modalId, pushHistory = true) => {
+    const targetModal = modalById.get(modalId);
+    if (!targetModal) {
+      return;
+    }
+
+    const activeModalId =
+      modalHistory.length > 0 ? modalHistory[modalHistory.length - 1] : null;
+    if (activeModalId) {
+      const activeModal = modalById.get(activeModalId);
+      if (activeModal) {
+        setModalState(activeModal, false);
+      }
+    }
+
+    setModalState(targetModal, true);
+    document.body.classList.add("menu-modal-open");
+
+    if (pushHistory) {
+      modalHistory.push(modalId);
+    }
+
+    focusFirstModalControl(targetModal);
+  };
+
+  const closeAllModals = () => {
+    modalHistory.length = 0;
+    modalById.forEach((modal) => {
+      setModalState(modal, false);
+    });
+    document.body.classList.remove("menu-modal-open");
+    closeCreateCustomSelect();
+    clearAdminLoginUiState();
+    resetCreateVehicleModal();
+    resetEditVehicleModal();
+
+    if (lastFocusedElement instanceof HTMLElement) {
+      lastFocusedElement.focus({ preventScroll: true });
+    }
+  };
+
+  const goBack = () => {
+    if (modalHistory.length > 1) {
+      const currentModalId = modalHistory.pop();
+      const previousModalId = modalHistory[modalHistory.length - 1];
+      const currentModal = modalById.get(currentModalId);
+      const previousModal = modalById.get(previousModalId);
+
+      if (currentModalId === "admin-login-modal") {
+        clearAdminLoginUiState();
+      }
+
+      if (currentModal) {
+        setModalState(currentModal, false);
+      }
+
+      if (previousModal) {
+        setModalState(previousModal, true);
+        focusFirstModalControl(previousModal);
+      }
+
+      return;
+    }
+
+    const hasSafeHistory =
+      window.history.length > 1 &&
+      typeof document.referrer === "string" &&
+      document.referrer.startsWith(window.location.origin);
+
+    closeAllModals();
+
+    if (hasSafeHistory) {
+      window.history.back();
+    }
+  };
+
+  menuOpenButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      lastFocusedElement =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      modalHistory.length = 0;
+      showModal("menu-modal", true);
+    });
+  });
+
+  targetButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const targetId = button.getAttribute("data-modal-target");
+      if (!targetId) {
+        return;
+      }
+
+      if (targetId === "admin-vehicle-read-modal") {
+        hydrateReadVehicleModal(button);
+      }
+
+      if (targetId === "admin-delete-vehicle-modal") {
+        hydrateDeleteVehicleModal(button);
+      }
+
+      if (targetId === "admin-maintenance-fill-modal") {
+        hydrateMaintenanceFillModal(button);
+      }
+
+      if (targetId === "admin-maintenance-edit-modal") {
+        hydrateMaintenanceEditModal(button);
+      }
+
+      if (targetId === "admin-create-vehicle-modal") {
+        hydrateCreateVehicleModal(button);
+      }
+
+      if (targetId === "admin-edit-vehicle-modal") {
+        hydrateEditVehicleModal(button);
+      }
+
+      if (modalHistory.length === 0) {
+        lastFocusedElement =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+      }
+
+      showModal(targetId, true);
+    });
+  });
+
+  closeButtons.forEach((button) => {
+    button.addEventListener("click", closeAllModals);
+  });
+
+  backButtons.forEach((button) => {
+    button.addEventListener("click", goBack);
+  });
+
+  if (
+    adminCreateVehicleTypeInput instanceof HTMLSelectElement &&
+    adminCreateFleetTypeInput instanceof HTMLInputElement
+  ) {
+    adminCreateVehicleTypeInput.addEventListener("change", () => {
+      adminCreateFleetTypeInput.value = adminCreateVehicleTypeInput.value;
+    });
+  }
+
+  if (
+    adminEditVehicleTypeInput instanceof HTMLSelectElement &&
+    adminEditFleetTypeInput instanceof HTMLInputElement
+  ) {
+    adminEditVehicleTypeInput.addEventListener("change", () => {
+      adminEditFleetTypeInput.value = adminEditVehicleTypeInput.value;
+    });
+  }
+
+  if (adminCreateImageInput instanceof HTMLInputElement) {
+    adminCreateImageInput.addEventListener("change", updateCreateImageUi);
+  }
+
+  if (adminEditImageInput instanceof HTMLInputElement) {
+    adminEditImageInput.addEventListener("change", updateEditImageUi);
+  }
+
+  if (
+    adminCreateImageClearButton instanceof HTMLElement &&
+    adminCreateImageInput instanceof HTMLInputElement
+  ) {
+    adminCreateImageClearButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      adminCreateImageInput.value = "";
+      updateCreateImageUi();
+    });
+  }
+
+  if (
+    adminEditImageClearButton instanceof HTMLElement &&
+    adminEditImageInput instanceof HTMLInputElement
+  ) {
+    adminEditImageClearButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      adminEditImageInput.value = "";
+      updateEditImageUi();
+    });
+  }
+
+  adminCreateStepNextButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!validateCreateVehicleStep(createVehicleStep)) {
+        return;
+      }
+
+      setCreateVehicleStep(createVehicleStep + 1);
+    });
+  });
+
+  adminCreateStepPrevButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setCreateVehicleStep(createVehicleStep - 1);
+    });
+  });
+
+  adminEditStepNextButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!validateEditVehicleStep(editVehicleStep)) {
+        return;
+      }
+
+      setEditVehicleStep(editVehicleStep + 1);
+    });
+  });
+
+  adminEditStepPrevButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setEditVehicleStep(editVehicleStep - 1);
+    });
+  });
+
+  if (adminCreateStepCloseButton instanceof HTMLElement) {
+    adminCreateStepCloseButton.addEventListener("click", closeAllModals);
+  }
+
+  if (adminEditStepCloseButton instanceof HTMLElement) {
+    adminEditStepCloseButton.addEventListener("click", closeAllModals);
+  }
+
+  navigationLinks.forEach((link) => {
+    link.addEventListener("click", () => {
+      closeAllModals();
+    });
+  });
+
+  passwordToggleButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const targetId = button.getAttribute("data-password-target");
+      if (!targetId) {
+        return;
+      }
+
+      const targetInput = document.getElementById(targetId);
+      if (!(targetInput instanceof HTMLInputElement)) {
+        return;
+      }
+
+      const shouldShow = targetInput.type === "password";
+      targetInput.type = shouldShow ? "text" : "password";
+      button.setAttribute(
+        "aria-label",
+        shouldShow ? "Hide password" : "Show password",
+      );
+
+      const icon = button.querySelector(".material-symbols-rounded");
+      if (icon) {
+        icon.textContent = shouldShow ? "visibility_off" : "visibility";
+      }
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (
+      openCreateCustomSelectController &&
+      !openCreateCustomSelectController.shell.contains(target)
+    ) {
+      closeCreateCustomSelect(openCreateCustomSelectController);
+    }
+
+    if (target.classList.contains("menu-modal__overlay")) {
+      closeAllModals();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (openCreateCustomSelectController) {
+        closeCreateCustomSelect(openCreateCustomSelectController);
+        return;
+      }
+
+      closeAllModals();
+    }
+  });
+
+  const autoOpenAdminModal =
+    document
+      .getElementById("admin-login-modal")
+      ?.getAttribute("data-open-on-load") === "true";
+  if (autoOpenAdminModal) {
+    modalHistory.length = 0;
+    showModal("menu-modal", true);
+    showModal("admin-login-modal", true);
+  } else {
+    clearAdminLoginUiState();
+  }
+
+  window.addEventListener("pageshow", () => {
+    if (!autoOpenAdminModal) {
+      clearAdminLoginUiState();
+    }
+  });
+
+  // maintenance edit/fillup form: reopen read modal after maintenance actions when backend provides auto-open vehicle context.
+  const autoOpenReadTrigger = document.querySelector(
+    "[data-modal-target='admin-vehicle-read-modal'][data-auto-open-read='true']",
+  );
+  if (autoOpenReadTrigger instanceof HTMLElement) {
+    lastFocusedElement = autoOpenReadTrigger;
+    hydrateReadVehicleModal(autoOpenReadTrigger);
+    showModal("admin-vehicle-read-modal", true);
+  }
 })();

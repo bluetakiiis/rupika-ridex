@@ -820,14 +820,18 @@ if (!function_exists('vehicle_sync_apply_resolved_rows_to_db')) {
 		$now = date('Y-m-d H:i:s');
 
 		$usedVehicleIds = [];
+		$maxVehicleId = 0;
 		foreach ($dbRowsByPlate as $existingRow) {
 			$existingId = (int) ($existingRow['id'] ?? 0);
 			if ($existingId > 0) {
 				$usedVehicleIds[$existingId] = true;
+				if ($existingId > $maxVehicleId) {
+					$maxVehicleId = $existingId;
+				}
 			}
 		}
 
-		$nextSequentialVehicleId = count($dbRowsByPlate) + 1;
+		$nextSequentialVehicleId = $maxVehicleId + 1;
 		while (isset($usedVehicleIds[$nextSequentialVehicleId])) {
 			$nextSequentialVehicleId++;
 		}

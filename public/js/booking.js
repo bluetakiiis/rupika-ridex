@@ -5,6 +5,14 @@
 (function () {
   const DATE_INPUT_IDS = ["pickup-date", "return-date"];
   const TIME_INPUT_IDS = ["pickup-time", "return-time"];
+  const MAINTENANCE_DATE_INPUT_IDS = [
+    "maintenance-fill-estimate",
+    "maintenance-edit-estimate",
+  ];
+  const CREATE_VEHICLE_DATE_INPUT_IDS = [
+    "create-vehicle-last-service-date",
+    "edit-vehicle-last-service-date",
+  ];
 
   const getInputById = (id) => document.getElementById(id);
 
@@ -23,9 +31,7 @@
     if (typeof input.showPicker === "function") {
       try {
         input.showPicker();
-      } catch (error) {
-        
-      }
+      } catch (error) {}
       return;
     }
 
@@ -167,6 +173,26 @@
       input.placeholder = "";
     });
 
+    MAINTENANCE_DATE_INPUT_IDS.forEach((id) => {
+      const input = getInputById(id);
+      if (!input) {
+        return;
+      }
+
+      input.type = "date";
+      input.placeholder = "";
+    });
+
+    CREATE_VEHICLE_DATE_INPUT_IDS.forEach((id) => {
+      const input = getInputById(id);
+      if (!input) {
+        return;
+      }
+
+      input.type = "date";
+      input.placeholder = "";
+    });
+
     TIME_INPUT_IDS.forEach((id) => {
       const input = getInputById(id);
       if (!input) {
@@ -200,7 +226,34 @@
         '<span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>',
     };
 
+    const maintenanceDateOptions = {
+      ...sharedPickerOptions,
+      dateFormat: "d M, Y",
+      prevArrow:
+        '<span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>',
+      nextArrow:
+        '<span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>',
+    };
+
     DATE_INPUT_IDS.forEach((id) => {
+      const input = getInputById(id);
+      if (!input) {
+        return;
+      }
+
+      window.flatpickr(input, dateOptions);
+    });
+
+    MAINTENANCE_DATE_INPUT_IDS.forEach((id) => {
+      const input = getInputById(id);
+      if (!input) {
+        return;
+      }
+
+      window.flatpickr(input, maintenanceDateOptions);
+    });
+
+    CREATE_VEHICLE_DATE_INPUT_IDS.forEach((id) => {
       const input = getInputById(id);
       if (!input) {
         return;
@@ -228,7 +281,21 @@
   };
 
   const initBookingPickers = () => {
-    if (!document.querySelector(".booking-engine")) {
+    const hasBookingEngine = Boolean(document.querySelector(".booking-engine"));
+    const hasMaintenancePickers = Boolean(
+      document.querySelector("[data-maintenance-estimate-input]") ||
+      document.querySelector("[data-maintenance-edit-estimate-input]"),
+    );
+    const hasCreateVehicleDatePicker = Boolean(
+      document.querySelector("[data-create-last-service-input]") ||
+      document.querySelector("[data-edit-last-service-input]"),
+    );
+
+    if (
+      !hasBookingEngine &&
+      !hasMaintenancePickers &&
+      !hasCreateVehicleDatePicker
+    ) {
       return;
     }
 

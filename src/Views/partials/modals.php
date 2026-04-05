@@ -162,7 +162,17 @@ if ($adminProfilePhone === '') {
 					/>
 				</div>
 
-				<span class="material-symbols-rounded admin-vehicle-read-modal__maintenance-indicator" aria-hidden="true" data-read-maintenance-indicator hidden>build</span>
+				<?php // maintenance edit/fillup form: available-vehicle maintenance trigger icon opens maintenance fill modal. ?>
+				<button
+					class="admin-vehicle-read-modal__maintenance-indicator"
+					type="button"
+					aria-label="Open maintenance form"
+					data-read-maintenance-indicator
+					data-modal-target="admin-maintenance-fill-modal"
+					hidden
+				>
+					<span class="material-symbols-rounded" aria-hidden="true">build</span>
+				</button>
 				<button class="menu-modal__close" type="button" aria-label="Close vehicle read prompt" data-modal-close>
 					<span class="material-symbols-rounded" aria-hidden="true">close</span>
 				</button>
@@ -206,7 +216,8 @@ if ($adminProfilePhone === '') {
 				</table>
 
 				<div class="admin-vehicle-read-modal__actions">
-					<button class="admin-vehicle-read-modal__edit" type="button">Edit</button>
+					<?php // maintenance edit/fillup form: read modal edit action routes to maintenance edit modal when vehicle is in maintenance. ?>
+					<button class="admin-vehicle-read-modal__edit" type="button" data-read-edit-action>Edit</button>
 					<button
 						class="admin-vehicle-read-modal__delete"
 						type="button"
@@ -222,6 +233,404 @@ if ($adminProfilePhone === '') {
 			<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
 				<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
 			</button>
+		</section>
+	</div>
+
+	<?php // maintenance edit/fillup form: maintenance creation modal for transitioning an available vehicle to maintenance status. ?>
+	<div class="menu-modal admin-maintenance-modal" id="admin-maintenance-fill-modal" hidden aria-hidden="true" data-modal-id="admin-maintenance-fill-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog admin-maintenance-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="admin-maintenance-fill-title">
+			<header class="menu-modal__header admin-maintenance-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex maintenance form">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<button class="menu-modal__close" type="button" aria-label="Close maintenance form" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
+			</header>
+
+			<div class="admin-maintenance-modal__content">
+				<form class="admin-maintenance-modal__form" method="post" action="index.php" data-maintenance-fill-form>
+					<input type="hidden" name="action" value="admin-start-maintenance" />
+					<input type="hidden" name="vehicle_id" value="" data-maintenance-vehicle-id-input />
+					<input type="hidden" name="fleet_mode" value="type" data-maintenance-fleet-mode-input />
+					<input type="hidden" name="fleet_type" value="cars" data-maintenance-fleet-type-input />
+					<input type="hidden" name="fleet_status" value="maintenance" data-maintenance-fleet-status-input />
+
+					<label class="admin-maintenance-modal__label" for="maintenance-fill-issue">Issue Description</label>
+					<input class="admin-maintenance-modal__input" type="text" id="maintenance-fill-issue" name="issue_description" maxlength="255" required data-maintenance-issue-input />
+
+					<label class="admin-maintenance-modal__label" for="maintenance-fill-workshop">Workshop Name</label>
+					<input class="admin-maintenance-modal__input" type="text" id="maintenance-fill-workshop" name="workshop_name" maxlength="150" required data-maintenance-workshop-input />
+
+					<label class="admin-maintenance-modal__label" for="maintenance-fill-estimate">Est. Completion</label>
+					<div class="admin-maintenance-modal__date-wrap">
+						<input class="admin-maintenance-modal__input" type="text" id="maintenance-fill-estimate" name="estimate_completion_date" required inputmode="none" data-maintenance-estimate-input />
+						<button class="booking-input__icon-button admin-maintenance-modal__date-button" type="button" aria-label="Open calendar" data-open-picker-for="maintenance-fill-estimate">
+							<span class="material-symbols-rounded admin-maintenance-modal__date-icon" aria-hidden="true">calendar_month</span>
+						</button>
+					</div>
+
+					<label class="admin-maintenance-modal__label" for="maintenance-fill-cost">Service Cost</label>
+					<input class="admin-maintenance-modal__input" type="number" id="maintenance-fill-cost" name="service_cost" min="0" step="0.01" required data-maintenance-cost-input />
+
+					<div class="admin-maintenance-modal__actions">
+						<button class="admin-maintenance-modal__submit" type="submit">Update</button>
+					</div>
+				</form>
+			</div>
+
+			<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+				<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+			</button>
+		</section>
+	</div>
+
+	<?php // maintenance edit/fillup form: maintenance edit modal with update and complete service actions. ?>
+	<div class="menu-modal admin-maintenance-modal" id="admin-maintenance-edit-modal" hidden aria-hidden="true" data-modal-id="admin-maintenance-edit-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog admin-maintenance-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="admin-maintenance-edit-title">
+			<header class="menu-modal__header admin-maintenance-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex maintenance edit form">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<button class="menu-modal__close" type="button" aria-label="Close maintenance edit form" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
+			</header>
+
+			<div class="admin-maintenance-modal__content">
+				<form class="admin-maintenance-modal__form" method="post" action="index.php" id="admin-maintenance-edit-form" data-maintenance-edit-form>
+					<input type="hidden" name="action" value="admin-update-maintenance" />
+					<input type="hidden" name="vehicle_id" value="" data-maintenance-edit-vehicle-id-input />
+					<input type="hidden" name="fleet_mode" value="status" data-maintenance-edit-fleet-mode-input />
+					<input type="hidden" name="fleet_type" value="cars" data-maintenance-edit-fleet-type-input />
+					<input type="hidden" name="fleet_status" value="maintenance" data-maintenance-edit-fleet-status-input />
+
+					<label class="admin-maintenance-modal__label" for="maintenance-edit-issue">Issue Description</label>
+					<input class="admin-maintenance-modal__input" type="text" id="maintenance-edit-issue" name="issue_description" maxlength="255" required data-maintenance-edit-issue-input />
+
+					<label class="admin-maintenance-modal__label" for="maintenance-edit-workshop">Workshop Name</label>
+					<input class="admin-maintenance-modal__input" type="text" id="maintenance-edit-workshop" name="workshop_name" maxlength="150" required data-maintenance-edit-workshop-input />
+
+					<label class="admin-maintenance-modal__label" for="maintenance-edit-estimate">Est. Completion</label>
+					<div class="admin-maintenance-modal__date-wrap">
+						<input class="admin-maintenance-modal__input" type="text" id="maintenance-edit-estimate" name="estimate_completion_date" required inputmode="none" data-maintenance-edit-estimate-input />
+						<button class="booking-input__icon-button admin-maintenance-modal__date-button" type="button" aria-label="Open calendar" data-open-picker-for="maintenance-edit-estimate">
+							<span class="material-symbols-rounded admin-maintenance-modal__date-icon" aria-hidden="true">calendar_month</span>
+						</button>
+					</div>
+
+					<label class="admin-maintenance-modal__label" for="maintenance-edit-cost">Service Cost</label>
+					<input class="admin-maintenance-modal__input" type="number" id="maintenance-edit-cost" name="service_cost" min="0" step="0.01" required data-maintenance-edit-cost-input />
+
+				</form>
+
+				<div class="admin-maintenance-modal__actions admin-maintenance-modal__actions--dual">
+					<form id="admin-maintenance-complete-form" method="post" action="index.php" class="admin-maintenance-modal__complete-form">
+						<input type="hidden" name="action" value="admin-complete-maintenance" />
+						<input type="hidden" name="vehicle_id" value="" data-maintenance-complete-vehicle-id-input />
+						<input type="hidden" name="fleet_mode" value="status" data-maintenance-complete-fleet-mode-input />
+						<input type="hidden" name="fleet_type" value="cars" data-maintenance-complete-fleet-type-input />
+						<input type="hidden" name="fleet_status" value="maintenance" data-maintenance-complete-fleet-status-input />
+						<button class="admin-maintenance-modal__complete" type="submit">Complete Service</button>
+					</form>
+					<button class="admin-maintenance-modal__submit" type="submit" form="admin-maintenance-edit-form">Update</button>
+				</div>
+			</div>
+
+			<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+				<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+			</button>
+		</section>
+	</div>
+
+	<?php // create vehicle modal: three-part admin create flow (part 1/2/3) using existing modal system and required fields before submission. ?>
+	<div class="menu-modal admin-create-vehicle-modal" id="admin-create-vehicle-modal" hidden aria-hidden="true" data-modal-id="admin-create-vehicle-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog admin-create-vehicle-modal__dialog" role="dialog" aria-modal="true" aria-label="Create vehicle form">
+			<header class="menu-modal__header admin-create-vehicle-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex create vehicle form">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<button class="menu-modal__close" type="button" aria-label="Close create vehicle form" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
+			</header>
+
+			<div class="admin-create-vehicle-modal__content">
+				<form class="admin-create-vehicle-modal__form" method="post" action="index.php" enctype="multipart/form-data" data-admin-create-vehicle-form>
+					<input type="hidden" name="action" value="admin-create-vehicle" />
+					<input type="hidden" name="fleet_mode" value="type" data-create-fleet-mode-input />
+					<input type="hidden" name="fleet_type" value="cars" data-create-fleet-type-input />
+
+					<section class="admin-create-vehicle-modal__step is-active" data-create-step-panel="1" aria-label="Create vehicle part 1">
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-type">Vehicle Type</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="create-vehicle-type" name="vehicle_type" required data-create-vehicle-type-input>
+							<option value="cars">Car</option>
+							<option value="bikes">Bike</option>
+							<option value="luxury">Luxury</option>
+						</select>
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-full-name">Vehicle Full Name</label>
+						<input class="admin-create-vehicle-modal__input" type="text" id="create-vehicle-full-name" name="full_name" maxlength="150" required />
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-name">Vehicle Name</label>
+						<input class="admin-create-vehicle-modal__input" type="text" id="create-vehicle-name" name="short_name" maxlength="100" required />
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-price">Price Per Day</label>
+						<input class="admin-create-vehicle-modal__input" type="number" id="create-vehicle-price" name="price_per_day" min="1" step="0.01" required />
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-driver-age">Driver's ID</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="create-vehicle-driver-age" name="driver_age_requirement" required>
+							<option value="18">18+</option>
+							<option value="21">21+</option>
+						</select>
+
+						<div class="admin-create-vehicle-modal__footer">
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Close create vehicle form" data-create-step-close>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+							</button>
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Go to create vehicle part 2" data-create-step-next>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+							</button>
+						</div>
+					</section>
+
+					<section class="admin-create-vehicle-modal__step" data-create-step-panel="2" aria-label="Create vehicle part 2" hidden>
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-image">Upload Image</label>
+						<div class="admin-create-vehicle-modal__file-wrap">
+							<input class="admin-create-vehicle-modal__input admin-create-vehicle-modal__input--file-name" type="text" id="create-vehicle-image-name" readonly aria-hidden="true" tabindex="-1" />
+							<button class="admin-create-vehicle-modal__file-clear" type="button" aria-label="Clear selected image" data-create-image-clear hidden>
+								<span class="material-symbols-rounded" aria-hidden="true">close</span>
+							</button>
+							<input class="admin-create-vehicle-modal__file-input" type="file" id="create-vehicle-image" name="image_file" accept="image/png,image/jpeg,image/jpg,image/webp" required data-create-image-input />
+						</div>
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-seats">Seats</label>
+						<input class="admin-create-vehicle-modal__input" type="number" id="create-vehicle-seats" name="number_of_seats" min="1" max="12" required />
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-transmission">Transmission</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="create-vehicle-transmission" name="transmission_type" required>
+							<option value="manual">Manual</option>
+							<option value="automatic">Automatic</option>
+							<option value="hybrid">Hybrid</option>
+							<option value="N/A">N/A</option>
+						</select>
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-fuel">Fuel Type</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="create-vehicle-fuel" name="fuel_type" required>
+							<option value="petrol">Petrol</option>
+							<option value="diesel">Diesel</option>
+							<option value="electric">Electric</option>
+						</select>
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-license">License Plate No.</label>
+						<input class="admin-create-vehicle-modal__input" type="text" id="create-vehicle-license" name="license_plate" maxlength="50" required />
+
+						<div class="admin-create-vehicle-modal__footer">
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Go back to create vehicle part 1" data-create-step-prev>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+							</button>
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Go to create vehicle part 3" data-create-step-next>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+							</button>
+						</div>
+					</section>
+
+					<section class="admin-create-vehicle-modal__step" data-create-step-panel="3" aria-label="Create vehicle part 3" hidden>
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-gps-id">GPS ID</label>
+						<input class="admin-create-vehicle-modal__input" type="text" id="create-vehicle-gps-id" name="gps_id" maxlength="50" required />
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-status">Initial Vehicle Status</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="create-vehicle-status" name="status" required>
+							<option value="available">Available</option>
+							<option value="reserved">Reserved</option>
+							<option value="on_trip">On Trip</option>
+							<option value="overdue">Overdue</option>
+							<option value="maintenance">Maintenance</option>
+						</select>
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-last-service-date">Last Service Date</label>
+						<div class="admin-create-vehicle-modal__date-wrap">
+							<input class="admin-create-vehicle-modal__input" type="text" id="create-vehicle-last-service-date" name="last_service_date" required inputmode="none" data-create-last-service-input />
+							<button class="booking-input__icon-button admin-create-vehicle-modal__date-button" type="button" aria-label="Open calendar" data-open-picker-for="create-vehicle-last-service-date">
+								<span class="material-symbols-rounded admin-create-vehicle-modal__date-icon" aria-hidden="true">calendar_month</span>
+							</button>
+						</div>
+
+						<label class="admin-create-vehicle-modal__label" for="create-vehicle-description">Vehicle Description (Detailed)</label>
+						<textarea class="admin-create-vehicle-modal__textarea" id="create-vehicle-description" name="description" maxlength="2000" required></textarea>
+
+						<div class="admin-create-vehicle-modal__footer admin-create-vehicle-modal__footer--submit">
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Go back to create vehicle part 2" data-create-step-prev>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+							</button>
+							<button class="admin-create-vehicle-modal__submit" type="submit">Create</button>
+						</div>
+					</section>
+				</form>
+			</div>
+		</section>
+	</div>
+
+	<?php // edit vehicle modal: three-part admin edit flow matching create modal layout with prefilled vehicle data and update action. ?>
+	<div class="menu-modal admin-edit-vehicle-modal" id="admin-edit-vehicle-modal" hidden aria-hidden="true" data-modal-id="admin-edit-vehicle-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog admin-create-vehicle-modal__dialog" role="dialog" aria-modal="true" aria-label="Edit vehicle form">
+			<header class="menu-modal__header admin-create-vehicle-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex edit vehicle form">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<button class="menu-modal__close" type="button" aria-label="Close edit vehicle form" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
+			</header>
+
+			<div class="admin-create-vehicle-modal__content">
+				<form class="admin-create-vehicle-modal__form" method="post" action="index.php" enctype="multipart/form-data" data-admin-edit-vehicle-form>
+					<input type="hidden" name="action" value="admin-update-vehicle" />
+					<input type="hidden" name="vehicle_id" value="" data-edit-vehicle-id-input />
+					<input type="hidden" name="current_image_path" value="" data-edit-current-image-path-input />
+					<input type="hidden" name="fleet_mode" value="type" data-edit-fleet-mode-input />
+					<input type="hidden" name="fleet_type" value="cars" data-edit-fleet-type-input />
+					<input type="hidden" name="fleet_status" value="reserved" data-edit-fleet-status-input />
+
+					<section class="admin-create-vehicle-modal__step is-active" data-edit-step-panel="1" aria-label="Edit vehicle part 1">
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-type">Vehicle Type</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="edit-vehicle-type" name="vehicle_type" required data-edit-vehicle-type-input>
+							<option value="cars">Car</option>
+							<option value="bikes">Bike</option>
+							<option value="luxury">Luxury</option>
+						</select>
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-full-name">Vehicle Full Name</label>
+						<input class="admin-create-vehicle-modal__input" type="text" id="edit-vehicle-full-name" name="full_name" maxlength="150" required data-edit-vehicle-full-name-input />
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-name">Vehicle Name</label>
+						<input class="admin-create-vehicle-modal__input" type="text" id="edit-vehicle-name" name="short_name" maxlength="100" required data-edit-vehicle-short-name-input />
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-price">Price Per Day</label>
+						<input class="admin-create-vehicle-modal__input" type="number" id="edit-vehicle-price" name="price_per_day" min="1" step="0.01" required data-edit-vehicle-price-input />
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-driver-age">Driver's ID</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="edit-vehicle-driver-age" name="driver_age_requirement" required data-edit-vehicle-driver-age-input>
+							<option value="18">18+</option>
+							<option value="21">21+</option>
+						</select>
+
+						<div class="admin-create-vehicle-modal__footer">
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Close edit vehicle form" data-edit-step-close>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+							</button>
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Go to edit vehicle part 2" data-edit-step-next>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+							</button>
+						</div>
+					</section>
+
+					<section class="admin-create-vehicle-modal__step" data-edit-step-panel="2" aria-label="Edit vehicle part 2" hidden>
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-image">Upload New Image</label>
+						<div class="admin-create-vehicle-modal__file-wrap">
+							<input class="admin-create-vehicle-modal__input admin-create-vehicle-modal__input--file-name" type="text" id="edit-vehicle-image-name" readonly aria-hidden="true" tabindex="-1" data-edit-image-name-input />
+							<button class="admin-create-vehicle-modal__file-clear" type="button" aria-label="Clear selected image" data-edit-image-clear hidden>
+								<span class="material-symbols-rounded" aria-hidden="true">close</span>
+							</button>
+							<input class="admin-create-vehicle-modal__file-input" type="file" id="edit-vehicle-image" name="image_file" accept="image/png,image/jpeg,image/jpg,image/webp" data-edit-image-input />
+						</div>
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-seats">Seats</label>
+						<input class="admin-create-vehicle-modal__input" type="number" id="edit-vehicle-seats" name="number_of_seats" min="1" max="12" required data-edit-vehicle-seats-input />
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-transmission">Transmission</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="edit-vehicle-transmission" name="transmission_type" required data-edit-vehicle-transmission-input>
+							<option value="manual">Manual</option>
+							<option value="automatic">Automatic</option>
+							<option value="hybrid">Hybrid</option>
+							<option value="N/A">N/A</option>
+						</select>
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-fuel">Fuel Type</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="edit-vehicle-fuel" name="fuel_type" required data-edit-vehicle-fuel-input>
+							<option value="petrol">Petrol</option>
+							<option value="diesel">Diesel</option>
+							<option value="electric">Electric</option>
+						</select>
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-license">License Plate No.</label>
+						<input class="admin-create-vehicle-modal__input" type="text" id="edit-vehicle-license" name="license_plate" maxlength="50" required data-edit-vehicle-license-input />
+
+						<div class="admin-create-vehicle-modal__footer">
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Go back to edit vehicle part 1" data-edit-step-prev>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+							</button>
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Go to edit vehicle part 3" data-edit-step-next>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+							</button>
+						</div>
+					</section>
+
+					<section class="admin-create-vehicle-modal__step" data-edit-step-panel="3" aria-label="Edit vehicle part 3" hidden>
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-gps-id">GPS ID</label>
+						<input class="admin-create-vehicle-modal__input" type="text" id="edit-vehicle-gps-id" name="gps_id" maxlength="50" required data-edit-vehicle-gps-id-input />
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-status">Vehicle Status</label>
+						<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select" id="edit-vehicle-status" name="status" required data-edit-vehicle-status-input>
+							<option value="available">Available</option>
+							<option value="reserved">Reserved</option>
+							<option value="on_trip">On Trip</option>
+							<option value="overdue">Overdue</option>
+							<option value="maintenance">Maintenance</option>
+						</select>
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-last-service-date">Last Service Date</label>
+						<div class="admin-create-vehicle-modal__date-wrap">
+							<input class="admin-create-vehicle-modal__input" type="text" id="edit-vehicle-last-service-date" name="last_service_date" required inputmode="none" data-edit-last-service-input />
+							<button class="booking-input__icon-button admin-create-vehicle-modal__date-button" type="button" aria-label="Open calendar" data-open-picker-for="edit-vehicle-last-service-date">
+								<span class="material-symbols-rounded admin-create-vehicle-modal__date-icon" aria-hidden="true">calendar_month</span>
+							</button>
+						</div>
+
+						<label class="admin-create-vehicle-modal__label" for="edit-vehicle-description">Vehicle Description (Detailed)</label>
+						<textarea class="admin-create-vehicle-modal__textarea" id="edit-vehicle-description" name="description" maxlength="2000" required data-edit-vehicle-description-input></textarea>
+
+						<div class="admin-create-vehicle-modal__footer admin-create-vehicle-modal__footer--submit">
+							<button class="menu-modal__back admin-create-vehicle-modal__nav" type="button" aria-label="Go back to edit vehicle part 2" data-edit-step-prev>
+								<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+							</button>
+							<button class="admin-create-vehicle-modal__submit" type="submit">Update</button>
+						</div>
+					</section>
+				</form>
+			</div>
 		</section>
 	</div>
 

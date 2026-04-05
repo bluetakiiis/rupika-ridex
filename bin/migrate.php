@@ -14,6 +14,7 @@ $defaultMigrations = [
 	'migrations/20260331_create_bookings_table.sql',
 	'migrations/20260331_create_payments_table.sql',
 	'migrations/20260331_create_gps_logs_table.sql',
+	'migrations/20260404_create_vehicle_maintenance_records_table.sql',
 ];
 
 $args = array_slice($_SERVER['argv'] ?? [], 1);
