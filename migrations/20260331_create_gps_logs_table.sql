@@ -1,6 +1,4 @@
--- Purpose: Capture time-series GPS telemetry for vehicles for live map and history.
--- Website Section: GPS Tracking (user live map, admin tracking/history).
--- Developer Notes: Composite index on vehicle_id/timestamp; stores speed, heading, fuel, safety_score.
+-- Purpose: Capture time-series GPS telemetry for vehicles for live map and history.---
 CREATE TABLE IF NOT EXISTS gps_logs (
 	id                    BIGINT AUTO_INCREMENT PRIMARY KEY,
 	vehicle_id            INT NOT NULL,

@@ -7,6 +7,7 @@
 DROP TABLE IF EXISTS gps_logs;
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS bookings;
+DROP TABLE IF EXISTS vehicle_maintenance_records;
 DROP TABLE IF EXISTS vehicles;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS users;
@@ -29,7 +30,7 @@ CREATE TABLE users (
 	street          VARCHAR(255),
 	post_code       VARCHAR(20),
 	city            VARCHAR(100),
-	province        ENUM('Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'),
+	province        ENUM('Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim') DEFAULT NULL,
 	role            ENUM('user','admin') NOT NULL DEFAULT 'user',
 	drivers_id      VARCHAR(50),  -- e.g. driver licence number; optional for admin
 	created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -93,7 +94,7 @@ CREATE TABLE bookings (
 	pickup_datetime       DATETIME NOT NULL,
 	return_datetime       DATETIME NOT NULL,
 	return_time           DATETIME NULL,
-	status                ENUM('pending','reserved','on_trip','overdue','completed','cancelled') NOT NULL DEFAULT 'pending',
+	status                ENUM('reserved','on_trip','overdue','completed','cancelled') NOT NULL DEFAULT 'reserved',
 	payment_status        ENUM('unpaid','pending','paid','cancelled','refunded') NOT NULL DEFAULT 'unpaid',
 	payment_method        ENUM('pay_on_arrival','khalti') NOT NULL,
 	total_amount          INT NOT NULL,
@@ -119,7 +120,7 @@ CREATE TABLE payments (
 	status                ENUM('initiated','pending','success','failed','cancelled','refunded') NOT NULL,
 	transaction_time      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	pidx                  VARCHAR(100),
-	provider_response     JSON,
+	provider_response     LONGTEXT CHECK (JSON_VALID(provider_response)),
 	created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT fk_payments_booking FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
@@ -143,4 +144,24 @@ CREATE TABLE gps_logs (
 	created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT fk_gpslogs_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
 	INDEX idx_vehicle_timestamp (vehicle_id, timestamp)
+);
+
+-- -------------------------------------------------------------------------
+-- Vehicle Maintenance Records
+-- Stores maintenance lifecycle details for each vehicle from admin maintenance
+-- fill/update/complete flows.
+CREATE TABLE vehicle_maintenance_records (
+	id INT AUTO_INCREMENT PRIMARY KEY,
+	vehicle_id INT NOT NULL,
+	issue_description TEXT NOT NULL,
+	workshop_name VARCHAR(150) NOT NULL,
+	estimate_completion_date DATE NOT NULL,
+	service_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
+	status ENUM('open','completed') NOT NULL DEFAULT 'open',
+	completed_at TIMESTAMP NULL DEFAULT NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT fk_maintenance_records_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
+	INDEX idx_maintenance_vehicle_status (vehicle_id, status),
+	INDEX idx_maintenance_vehicle_created (vehicle_id, created_at)
 );

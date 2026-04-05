@@ -1638,7 +1638,7 @@ if ($page === 'vehicles') {
 				SELECT b1.id
 				FROM bookings b1
 				WHERE b1.vehicle_id = v.id
-					AND b1.status IN ('reserved', 'ready', 'on_trip', 'overdue', 'pending')
+					AND b1.status IN ('reserved', 'on_trip', 'overdue')
 				ORDER BY COALESCE(b1.updated_at, b1.created_at) DESC, b1.id DESC
 				LIMIT 1
 			)
@@ -1654,7 +1654,7 @@ if ($page === 'vehicles') {
 				SELECT b2.id
 				FROM bookings b2
 				WHERE b2.vehicle_id = v.id
-					AND b2.status IN ('reserved', 'ready', 'pending')
+					AND b2.status IN ('reserved')
 					AND b2.pickup_datetime >= CURRENT_TIMESTAMP
 				ORDER BY b2.pickup_datetime ASC, b2.id ASC
 				LIMIT 1

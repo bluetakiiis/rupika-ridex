@@ -1,6 +1,4 @@
--- Purpose: Store reservation/rental records with booking lifecycle and payment status.
--- Website Section: Booking & Payment Flow (user checkout, admin booking oversight).
--- Developer Notes: Links to user, vehicle; includes pickup/return data, booking_number, drivers_id, payment tracking fields.
+-- Purpose: Store reservation/rental records with booking lifecycle and payment status.---
 CREATE TABLE IF NOT EXISTS bookings (
 	id                    INT AUTO_INCREMENT PRIMARY KEY,
 	booking_number        VARCHAR(15) NOT NULL UNIQUE,
@@ -11,7 +9,7 @@ CREATE TABLE IF NOT EXISTS bookings (
 	pickup_datetime       DATETIME NOT NULL,
 	return_datetime       DATETIME NOT NULL,
 	return_time           DATETIME NULL,
-	status                ENUM('pending','reserved','ready','on_trip','overdue','completed','cancelled') NOT NULL DEFAULT 'pending',
+	status                ENUM('reserved','on_trip','overdue','completed','cancelled') NOT NULL DEFAULT 'reserved',
 	payment_status        ENUM('unpaid','pending','paid','cancelled','refunded') NOT NULL DEFAULT 'unpaid',
 	payment_method        ENUM('pay_on_arrival','khalti') NOT NULL,
 	total_amount          INT NOT NULL,

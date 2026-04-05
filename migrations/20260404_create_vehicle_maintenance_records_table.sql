@@ -1,6 +1,4 @@
--- Purpose: Create vehicle maintenance records to persist maintenance fill/edit history.
--- Website Section: Admin Fleet Management.
--- Developer Notes: Stores issue, workshop, estimate, service cost, and completion state per vehicle.
+-- Purpose: Create vehicle maintenance records to persist maintenance fill/edit history.---
 CREATE TABLE IF NOT EXISTS vehicle_maintenance_records (
 	id INT AUTO_INCREMENT PRIMARY KEY,
 	vehicle_id INT NOT NULL,

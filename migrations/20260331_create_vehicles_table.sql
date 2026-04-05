@@ -1,6 +1,4 @@
--- Purpose: Create vehicles table capturing fleet metadata, pricing, status, and tracking fields.
--- Website Section: Vehicle Catalog & Admin Fleet Management.
--- Developer Notes: Requires categories table; includes status lifecycle, GPS hook, and service metadata.
+-- Purpose: Create vehicles table capturing fleet metadata, pricing, status, and tracking fields.---
 CREATE TABLE IF NOT EXISTS vehicles (
 	id                    INT AUTO_INCREMENT PRIMARY KEY,
 	category_id           INT NOT NULL,

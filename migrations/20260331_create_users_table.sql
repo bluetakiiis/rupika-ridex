@@ -1,6 +1,4 @@
--- Purpose: Define the users table for authentication and account roles (customers and admins).
--- Website Section: Authentication & Account Management (user login/registration, admin access).
--- Developer Notes: Run this migration first; enforces unique email and stores profile/contact plus drivers_id for booking flow.
+-- Purpose: Define the users table for authentication and account roles (customers and admins).---
 CREATE TABLE IF NOT EXISTS users (
 	id              INT AUTO_INCREMENT PRIMARY KEY,
 	name            VARCHAR(100) NOT NULL,
@@ -14,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
 	street          VARCHAR(255),
 	post_code       VARCHAR(20),
 	city            VARCHAR(100),
-	province        ENUM('Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'),
+	province        ENUM('Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim') DEFAULT NULL,
 	role            ENUM('user','admin') NOT NULL DEFAULT 'user',
 	drivers_id      VARCHAR(50),
 	created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
