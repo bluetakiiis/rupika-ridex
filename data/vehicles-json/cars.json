@@ -1,6 +1,6 @@
 {
     "category": "cars",
-    "synced_at": "2026-04-05T08:24:39+05:45",
+    "synced_at": "2026-04-05T13:32:26+05:45",
     "count": 5,
     "vehicles": [
         {
@@ -18,10 +18,10 @@
             "license_plate": "BAA-1234",
             "status": "available",
             "gps_id": "GPS-001",
-            "last_service_date": "2026-04-04",
+            "last_service_date": "2026-04-05",
             "description": "Maruti Suzuki Victoris combines comfort, safety, and modern technology for city and highway travel.",
             "created_at": "2026-04-02 07:19:07",
-            "updated_at": "2026-04-04 20:10:13"
+            "updated_at": "2026-04-05 08:58:14"
         },
         {
             "id": 4,

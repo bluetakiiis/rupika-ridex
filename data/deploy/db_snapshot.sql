@@ -19,7 +19,7 @@ INSERT INTO `categories` (`id`, `name`, `description`) VALUES
 
 -- Table: users
 INSERT INTO `users` (`id`, `name`, `first_name`, `last_name`, `email`, `password_hash`, `phone`, `address`, `date_of_birth`, `street`, `post_code`, `city`, `province`, `role`, `drivers_id`, `created_at`, `updated_at`) VALUES
-  (1, 'Ridex Admin', NULL, NULL, 'rupikadangol@gmail.com', '$2y$10$HhktETfbm3eJukXQ624Oi.EZd0tYpM34c4WSrdpG/plCzUd.2hoSS', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'admin', NULL, '2026-04-04 00:13:26', '2026-04-05 08:22:10'),
+  (1, 'Ridex Admin', NULL, NULL, 'rupikadangol@gmail.com', '$2y$10$hh5Rg645.rGAqPBOkZ8dB.NKplLqbpAVqOCQSaK.50JpWnHd2qx1m', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'admin', NULL, '2026-04-04 00:13:26', '2026-04-05 08:58:14'),
   (3, 'Ridex Admin', NULL, NULL, 'rupikadangole@gmail.com', '$2y$10$C.iqM1ZwDaatXwbf6lZRTePnoRcZw.WVjNhawiKWcLPKIdSsUOSVK', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'user', NULL, '2026-04-04 00:35:14', '2026-04-04 03:40:17');
 
 -- Table: vehicles
@@ -28,7 +28,7 @@ INSERT INTO `vehicles` (`id`, `category_id`, `vehicle_type`, `short_name`, `full
   (2, 1, 'cars', 'L07', 'DEEPAL L07', 70, 21, 'images/deepal-l07-white.png', 5, 'automatic', 'electric', 'BAA-1238', 'available', NULL, NULL, 'DEEPAL L07 is an all-electric sedan with modern design and a comfortable luxury cabin.', '2026-04-02 18:05:31', '2026-04-04 00:27:09'),
   (3, 1, 'cars', 'Honda Elevate', 'Honda Elevate', 47, 21, 'images/honda-elevate-2.png', 5, 'automatic', 'petrol', 'BAA-1236', 'available', NULL, NULL, 'Honda Elevate is a versatile SUV designed for mixed road conditions with strong comfort and safety features.', '2026-04-02 07:59:29', '2026-04-04 00:27:09'),
   (4, 1, 'cars', 'Honda Elevate', 'Honda Elevate', 47, 21, 'images/honda-elevate-1.png', 5, 'automatic', 'petrol', 'BAA-1235', 'available', NULL, NULL, 'Honda Elevate is a versatile SUV designed for mixed road conditions with strong comfort and safety features.', '2026-04-02 07:59:29', '2026-04-04 00:27:09'),
-  (5, 1, 'cars', 'Victoris', 'Maruti Suzuki Victoris', 52, 21, 'images/car1.png', 5, 'automatic', 'electric', 'BAA-1234', 'available', 'GPS-001', '2026-04-04', 'Maruti Suzuki Victoris combines comfort, safety, and modern technology for city and highway travel.', '2026-04-02 07:19:07', '2026-04-04 20:10:13'),
+  (5, 1, 'cars', 'Victoris', 'Maruti Suzuki Victoris', 52, 21, 'images/car1.png', 5, 'automatic', 'electric', 'BAA-1234', 'available', 'GPS-001', '2026-04-05', 'Maruti Suzuki Victoris combines comfort, safety, and modern technology for city and highway travel.', '2026-04-02 07:19:07', '2026-04-05 08:58:14'),
   (6, 2, 'bikes', 'Vespa', 'Vespa ZX 125', 30, 18, 'images/bikes.png', 2, 'N/A', 'petrol', 'BAA-1723', 'available', NULL, '2026-04-04', 'Vespa ZX 125 offers practical commuting performance with classic scooter styling.', '2026-04-02 18:05:31', '2026-04-04 20:11:09'),
   (7, 3, 'luxury', 'SL-Class (R231)', 'Mercedes-Benz SL-Class (R231)', 100, 21, 'images/luxury.png', 2, 'hybrid', 'petrol', 'BAA-1903', 'available', NULL, NULL, 'Mercedes-Benz SL-Class delivers premium grand touring comfort with high-performance engineering.', '2026-04-02 18:05:31', '2026-04-04 00:27:09'),
   (9, 3, 'luxury', 'Reserved', 'Mercedes-Benz SL-Class (R231)', 100, 21, 'images/luxury.png', 2, 'hybrid', 'petrol', 'BAA-1', 'reserved', NULL, NULL, 'Mercedes-Benz SL-Class delivers premium grand touring comfort with high-performance engineering.', '2026-04-04 08:50:02', '2026-04-04 08:50:02'),
@@ -44,6 +44,7 @@ INSERT INTO `vehicle_maintenance_records` (`id`, `vehicle_id`, `issue_descriptio
   (2, 13, 'Break not working properly', 'Ridex Workshop Center', '2026-04-04', '20.00', 'completed', '2026-04-04 19:22:09', '2026-04-04 19:21:19', '2026-04-04 19:22:09'),
   (3, 5, '123', '123', '2026-04-06', '50.00', 'completed', '2026-04-04 20:10:13', '2026-04-04 20:10:04', '2026-04-04 20:10:13'),
   (4, 6, 'Break not working properly', 'Ridex Workshop Center', '2026-01-20', '20.00', 'completed', '2026-04-04 20:11:09', '2026-04-04 20:10:49', '2026-04-04 20:11:09'),
-  (5, 13, 'Break not working properly', 'Ridex Workshop Center', '2026-04-04', '20.00', 'open', NULL, '2026-04-04 20:11:41', '2026-04-04 20:11:41');
+  (5, 13, 'Break not working properly', 'Ridex Workshop Center', '2026-04-04', '20.00', 'open', NULL, '2026-04-04 20:11:41', '2026-04-04 20:11:41'),
+  (6, 5, '123', '123', '2026-04-06', '50.00', 'completed', '2026-04-05 08:58:14', '2026-04-05 08:58:07', '2026-04-05 08:58:14');
 
 SET FOREIGN_KEY_CHECKS = 1;
