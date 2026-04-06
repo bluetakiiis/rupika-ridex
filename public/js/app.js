@@ -57,6 +57,15 @@
   const adminDeleteVehicleModal = document.getElementById(
     "admin-delete-vehicle-modal",
   );
+  const adminBookingReadModal = document.getElementById(
+    "admin-booking-read-modal",
+  );
+  const adminBookingTrackModal = document.getElementById(
+    "admin-booking-track-modal",
+  );
+  const adminDeleteBookingModal = document.getElementById(
+    "admin-delete-booking-modal",
+  );
   const adminDeleteVehicleIdInput = adminDeleteVehicleModal?.querySelector(
     "[data-delete-vehicle-id-input]",
   );
@@ -71,6 +80,161 @@
   );
   const adminDeleteFleetStatusInput = adminDeleteVehicleModal?.querySelector(
     "[data-delete-fleet-status-input]",
+  );
+  const adminBookingReadNumberNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-number]",
+  );
+  const adminBookingReadCustomerNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-customer]",
+  );
+  const adminBookingReadPaymentBadgeNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-payment-badge]",
+  );
+  const adminBookingReadPaymentIconNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-payment-icon]",
+  );
+  const adminBookingReadPaymentLabelNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-payment-label]",
+  );
+  const adminBookingReadStatusPill = adminBookingReadModal?.querySelector(
+    "[data-booking-read-status-pill]",
+  );
+  const adminBookingReadImage = adminBookingReadModal?.querySelector(
+    "[data-booking-read-image]",
+  );
+  const adminBookingReadVehicleTypeNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-vehicle-type]",
+  );
+  const adminBookingReadVehicleNameNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-vehicle-name]",
+  );
+  const adminBookingReadCustomerPhoneNode =
+    adminBookingReadModal?.querySelector("[data-booking-read-customer-phone]");
+  const adminBookingReadCustomerEmailNode =
+    adminBookingReadModal?.querySelector("[data-booking-read-customer-email]");
+  const adminBookingReadDriverIdNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-driver-id]",
+  );
+  const adminBookingReadPickupDateNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-pickup-date]",
+  );
+  const adminBookingReadReturnDateNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-return-date]",
+  );
+  const adminBookingReadReturnTimeNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-return-time]",
+  );
+  const adminBookingReadPricePerDayNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-price-per-day]",
+  );
+  const adminBookingReadDurationLabelNode =
+    adminBookingReadModal?.querySelector("[data-booking-read-duration-label]");
+  const adminBookingReadDurationPriceNode =
+    adminBookingReadModal?.querySelector("[data-booking-read-duration-price]");
+  const adminBookingReadDropChargeNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-drop-charge]",
+  );
+  const adminBookingReadLateFeeNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-late-fee]",
+  );
+  const adminBookingReadTaxesFeesNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-taxes-fees]",
+  );
+  const adminBookingReadBillingTotalNode = adminBookingReadModal?.querySelector(
+    "[data-booking-read-billing-total]",
+  );
+  const adminBookingCompleteForm = adminBookingReadModal?.querySelector(
+    "[data-booking-complete-form]",
+  );
+  const adminBookingCompleteIdInput = adminBookingReadModal?.querySelector(
+    "[data-booking-complete-id-input]",
+  );
+  const adminBookingReturnTimeInput = adminBookingReadModal?.querySelector(
+    "[data-booking-return-time-input]",
+  );
+  const adminBookingReturnTimePickerButtons = adminBookingReadModal
+    ? Array.from(
+        adminBookingReadModal.querySelectorAll(
+          "[data-open-picker-for='admin-booking-return-time-input']",
+        ),
+      )
+    : [];
+  const adminBookingLateFeePreview = adminBookingReadModal?.querySelector(
+    "[data-booking-late-fee-preview]",
+  );
+  const adminBookingCompleteSubmit = adminBookingReadModal?.querySelector(
+    "[data-booking-complete-submit]",
+  );
+  const adminBookingTrackAction = adminBookingReadModal?.querySelector(
+    "[data-booking-track-action]",
+  );
+  const adminBookingApproveForm = adminBookingReadModal?.querySelector(
+    "[data-booking-approve-form]",
+  );
+  const adminBookingApproveIdInput = adminBookingReadModal?.querySelector(
+    "[data-booking-approve-id-input]",
+  );
+  const adminBookingApproveAction = adminBookingReadModal?.querySelector(
+    "[data-booking-approve-action]",
+  );
+  const adminBookingDeleteAction = adminBookingReadModal?.querySelector(
+    "[data-booking-delete-action]",
+  );
+  const adminBookingTrackNumberNode = adminBookingTrackModal?.querySelector(
+    "[data-booking-track-number]",
+  );
+  const adminBookingTrackCustomerNode = adminBookingTrackModal?.querySelector(
+    "[data-booking-track-customer]",
+  );
+  const adminBookingTrackLocationLabelNode =
+    adminBookingTrackModal?.querySelector(
+      "[data-booking-track-location-label]",
+    );
+  const adminBookingTrackMapEmptyNode = adminBookingTrackModal?.querySelector(
+    "[data-booking-track-map-empty]",
+  );
+  const adminBookingTrackRouteNode = adminBookingTrackModal?.querySelector(
+    "[data-booking-track-route]",
+  );
+  const adminBookingTrackPickupPinNode = adminBookingTrackModal?.querySelector(
+    "[data-booking-track-pickup-pin]",
+  );
+  const adminBookingTrackReturnPinNode = adminBookingTrackModal?.querySelector(
+    "[data-booking-track-return-pin]",
+  );
+  const adminBookingTrackOpenMapsAction = adminBookingTrackModal?.querySelector(
+    "[data-booking-track-open-maps]",
+  );
+  const adminBookingTrackPickupLocationNode =
+    adminBookingTrackModal?.querySelector(
+      "[data-booking-track-pickup-location]",
+    );
+  const adminBookingTrackReturnLocationNode =
+    adminBookingTrackModal?.querySelector(
+      "[data-booking-track-return-location]",
+    );
+  const adminBookingTrackRiskLabelNode = adminBookingTrackModal?.querySelector(
+    "[data-booking-track-risk-label]",
+  );
+  const adminBookingTrackRiskPercentNode =
+    adminBookingTrackModal?.querySelector("[data-booking-track-risk-percent]");
+  const adminBookingTrackReturnRiskLabelNode =
+    adminBookingTrackModal?.querySelector(
+      "[data-booking-track-return-risk-label]",
+    );
+  const adminBookingTrackReturnRiskPercentNode =
+    adminBookingTrackModal?.querySelector(
+      "[data-booking-track-return-risk-percent]",
+    );
+  const adminBookingTrackSafetyScoreNode =
+    adminBookingTrackModal?.querySelector("[data-booking-track-safety-score]");
+  const adminBookingTrackSafetyLabelNode =
+    adminBookingTrackModal?.querySelector("[data-booking-track-safety-label]");
+  const adminDeleteBookingIdInput = adminDeleteBookingModal?.querySelector(
+    "[data-delete-booking-id-input]",
+  );
+  const adminDeleteBookingNameNode = adminDeleteBookingModal?.querySelector(
+    "[data-delete-booking-name]",
   );
   const adminReadBookingNumberNode = adminVehicleReadModal?.querySelector(
     "[data-read-booking-number]",
@@ -345,6 +509,7 @@
   let lastFocusedElement = null;
   const modalHistory = [];
   let readModalContext = null;
+  let bookingReadContext = null;
   let createVehicleStep = 1;
   let editVehicleStep = 1;
   const createCustomSelectControllers = [];
@@ -660,6 +825,970 @@
     const month = parsedDate.toLocaleString("en-US", { month: "short" });
     const year = parsedDate.getFullYear();
     return `${day} ${month}, ${year}`;
+  };
+
+  const parseDateTimeValue = (rawValue) => {
+    const normalized = String(rawValue || "").trim();
+    if (normalized === "") {
+      return null;
+    }
+
+    const parsedDate = new Date(
+      normalized.includes("T") ? normalized : normalized.replace(" ", "T"),
+    );
+    if (Number.isNaN(parsedDate.getTime())) {
+      return null;
+    }
+
+    return parsedDate;
+  };
+
+  const formatBookingCurrency = (rawValue) => {
+    const numericValue = Number.parseFloat(String(rawValue || "0"));
+    return Number.isFinite(numericValue)
+      ? `$${numericValue.toFixed(2)}`
+      : "$0.00";
+  };
+
+  const normalizeTrackText = (rawValue, fallbackValue = "Unavailable") => {
+    const normalized = String(rawValue || "").trim();
+    return normalized !== "" ? normalized : fallbackValue;
+  };
+
+  const parseTrackCoordinate = (rawValue) => {
+    const numericValue = Number.parseFloat(String(rawValue || "").trim());
+    if (!Number.isFinite(numericValue)) {
+      return null;
+    }
+
+    return numericValue;
+  };
+
+  const hasTrackGpsSignal = (latitude, longitude) => {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return false;
+    }
+
+    return Math.abs(latitude) > 0.00001 || Math.abs(longitude) > 0.00001;
+  };
+
+  const normalizeTrackRiskClass = (label) => {
+    const normalized = String(label || "")
+      .trim()
+      .toLowerCase();
+    if (normalized === "high") {
+      return "is-high";
+    }
+    if (normalized === "moderate") {
+      return "is-moderate";
+    }
+    if (normalized === "low") {
+      return "is-low";
+    }
+
+    return "";
+  };
+
+  const normalizeTrackSafetyClass = (label) => {
+    const normalized = String(label || "")
+      .trim()
+      .toLowerCase();
+    if (normalized === "high") {
+      return "is-high";
+    }
+    if (normalized === "moderate") {
+      return "is-moderate";
+    }
+    if (normalized === "low") {
+      return "is-low";
+    }
+
+    return "";
+  };
+
+  const bookingPaymentClassOptions = [
+    "admin-bookings__payment--paid",
+    "admin-bookings__payment--pending",
+    "admin-bookings__payment--cancelled",
+    "admin-bookings__payment--unpaid",
+    "admin-bookings__payment--refunded",
+    "admin-bookings__payment--unknown",
+  ];
+
+  const calculateBookingTaxesAndTotal = (
+    durationPrice,
+    dropCharge,
+    lateFee,
+    taxRate = 0.13,
+  ) => {
+    const normalizedDurationPrice = Number.isFinite(durationPrice)
+      ? durationPrice
+      : 0;
+    const normalizedDropCharge = Number.isFinite(dropCharge) ? dropCharge : 0;
+    const normalizedLateFee = Number.isFinite(lateFee) ? lateFee : 0;
+    const normalizedTaxRate = Number.isFinite(taxRate) ? taxRate : 0.13;
+
+    const taxBase = Math.max(
+      0,
+      normalizedDurationPrice + normalizedDropCharge + normalizedLateFee,
+    );
+    const taxes = taxBase * normalizedTaxRate;
+    const total = taxBase + taxes;
+
+    return {
+      taxes,
+      total,
+    };
+  };
+
+  const toDateTimeLocalInputValue = (rawValue) => {
+    const parsedDate = parseDateTimeValue(rawValue);
+    if (!parsedDate) {
+      return "";
+    }
+
+    const year = parsedDate.getFullYear();
+    const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(parsedDate.getDate()).padStart(2, "0");
+    const hours = String(parsedDate.getHours()).padStart(2, "0");
+    const minutes = String(parsedDate.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  };
+
+  const initAdminBookingReturnTimePicker = () => {
+    if (!(adminBookingReturnTimeInput instanceof HTMLInputElement)) {
+      return;
+    }
+
+    if (typeof window.flatpickr !== "function") {
+      return;
+    }
+
+    if (adminBookingReturnTimeInput._flatpickr) {
+      return;
+    }
+
+    window.flatpickr(adminBookingReturnTimeInput, {
+      allowInput: true,
+      disableMobile: true,
+      static: true,
+      monthSelectorType: "static",
+      enableTime: true,
+      noCalendar: false,
+      dateFormat: "Y-m-d H:i",
+      altInput: true,
+      altInputClass: "admin-booking-read-modal__input",
+      altFormat: "d/m/Y h:i K",
+      minuteIncrement: 5,
+      onReady: (_selectedDates, _dateStr, instance) => {
+        if (instance.altInput instanceof HTMLInputElement) {
+          instance.altInput.placeholder =
+            adminBookingReturnTimeInput.getAttribute("placeholder") ||
+            "dd/mm/yyyy  --:-- --";
+        }
+      },
+      onOpen: (_selectedDates, _dateStr, instance) => {
+        if (instance.calendarContainer instanceof HTMLElement) {
+          instance.calendarContainer.classList.add(
+            "admin-booking-return-flatpickr",
+          );
+        }
+      },
+      onValueUpdate: () => {
+        updateBookingLateFeePreview();
+      },
+      prevArrow:
+        '<span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>',
+      nextArrow:
+        '<span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>',
+    });
+  };
+
+  const readBookingBoolean = (triggerButton, attributeName) =>
+    String(
+      triggerButton.getAttribute(attributeName) || "false",
+    ).toLowerCase() === "true";
+
+  const resetBookingReadModal = () => {
+    bookingReadContext = null;
+
+    if (adminBookingCompleteForm instanceof HTMLFormElement) {
+      adminBookingCompleteForm.reset();
+      adminBookingCompleteForm.hidden = true;
+    }
+
+    if (adminBookingReturnTimeInput instanceof HTMLInputElement) {
+      adminBookingReturnTimeInput.required = false;
+      if (adminBookingReturnTimeInput._flatpickr) {
+        adminBookingReturnTimeInput._flatpickr.clear();
+      }
+    }
+
+    if (adminBookingReadReturnTimeNode instanceof HTMLElement) {
+      adminBookingReadReturnTimeNode.textContent = "N/A";
+    }
+
+    if (adminBookingReadStatusPill instanceof HTMLElement) {
+      adminBookingReadStatusPill.className =
+        "admin-booking-read-modal__status-pill admin-booking-read-modal__status-pill--unknown";
+      adminBookingReadStatusPill.textContent = "Unknown";
+    }
+
+    if (adminBookingReadPaymentBadgeNode instanceof HTMLElement) {
+      adminBookingReadPaymentBadgeNode.className =
+        "admin-booking-read-modal__payment admin-bookings__payment admin-bookings__payment--unknown";
+    }
+
+    if (adminBookingReadPaymentIconNode instanceof HTMLElement) {
+      adminBookingReadPaymentIconNode.textContent = "help";
+    }
+
+    if (adminBookingReadPaymentLabelNode instanceof HTMLElement) {
+      adminBookingReadPaymentLabelNode.textContent = "Unknown";
+    }
+
+    if (adminBookingTrackAction instanceof HTMLElement) {
+      adminBookingTrackAction.hidden = true;
+      adminBookingTrackAction.classList.remove("is-disabled");
+      adminBookingTrackAction.removeAttribute("aria-disabled");
+      adminBookingTrackAction.removeAttribute("tabindex");
+      adminBookingTrackAction.removeAttribute("data-booking-track-number");
+      adminBookingTrackAction.removeAttribute("data-booking-track-customer");
+      adminBookingTrackAction.removeAttribute("data-booking-track-location");
+      adminBookingTrackAction.removeAttribute("data-booking-track-pickup");
+      adminBookingTrackAction.removeAttribute("data-booking-track-return");
+      adminBookingTrackAction.removeAttribute(
+        "data-booking-track-return-risk-label",
+      );
+      adminBookingTrackAction.removeAttribute(
+        "data-booking-track-return-risk-percent",
+      );
+      adminBookingTrackAction.removeAttribute("data-booking-track-risk-label");
+      adminBookingTrackAction.removeAttribute(
+        "data-booking-track-risk-percent",
+      );
+      adminBookingTrackAction.removeAttribute(
+        "data-booking-track-safety-score",
+      );
+      adminBookingTrackAction.removeAttribute(
+        "data-booking-track-safety-label",
+      );
+      adminBookingTrackAction.removeAttribute("data-booking-track-map-url");
+      adminBookingTrackAction.removeAttribute("data-booking-track-has-signal");
+    }
+
+    if (adminBookingApproveForm instanceof HTMLElement) {
+      adminBookingApproveForm.hidden = true;
+    }
+
+    if (adminBookingDeleteAction instanceof HTMLElement) {
+      adminBookingDeleteAction.hidden = true;
+    }
+
+    if (adminBookingCompleteSubmit instanceof HTMLButtonElement) {
+      adminBookingCompleteSubmit.disabled = true;
+      adminBookingCompleteSubmit.hidden = true;
+    }
+
+    if (adminBookingLateFeePreview instanceof HTMLElement) {
+      adminBookingLateFeePreview.textContent = "Late fee: $0.00 (0h x $10)";
+      adminBookingLateFeePreview.hidden = true;
+    }
+  };
+
+  const updateBookingLateFeePreview = () => {
+    if (
+      !(adminBookingLateFeePreview instanceof HTMLElement) ||
+      !(adminBookingReturnTimeInput instanceof HTMLInputElement) ||
+      !bookingReadContext ||
+      bookingReadContext.allowLateFeePreview !== true
+    ) {
+      return;
+    }
+
+    const scheduledReturnDate = parseDateTimeValue(
+      bookingReadContext.scheduledReturnDatetime,
+    );
+    const selectedReturnDate = parseDateTimeValue(
+      adminBookingReturnTimeInput.value,
+    );
+
+    let lateHours = 0;
+    if (
+      scheduledReturnDate instanceof Date &&
+      selectedReturnDate instanceof Date &&
+      selectedReturnDate > scheduledReturnDate
+    ) {
+      lateHours = Math.floor(
+        (selectedReturnDate.getTime() - scheduledReturnDate.getTime()) /
+          (1000 * 60 * 60),
+      );
+      if (!Number.isFinite(lateHours) || lateHours < 0) {
+        lateHours = 0;
+      }
+    }
+
+    const lateFee = lateHours * 10;
+    adminBookingLateFeePreview.textContent = `Late fee: $${lateFee.toFixed(2)} (${lateHours}h x $10)`;
+    adminBookingLateFeePreview.hidden = false;
+
+    if (adminBookingReadLateFeeNode instanceof HTMLElement) {
+      adminBookingReadLateFeeNode.textContent = formatBookingCurrency(lateFee);
+    }
+
+    const billingSummary = calculateBookingTaxesAndTotal(
+      bookingReadContext.durationPrice,
+      bookingReadContext.dropCharge,
+      lateFee,
+      bookingReadContext.taxRate,
+    );
+
+    if (adminBookingReadTaxesFeesNode instanceof HTMLElement) {
+      adminBookingReadTaxesFeesNode.textContent = formatBookingCurrency(
+        billingSummary.taxes,
+      );
+    }
+
+    if (adminBookingReadBillingTotalNode instanceof HTMLElement) {
+      adminBookingReadBillingTotalNode.textContent = formatBookingCurrency(
+        billingSummary.total,
+      );
+    }
+  };
+
+  const hydrateBookingReadModal = (triggerButton) => {
+    if (!(triggerButton instanceof HTMLElement)) {
+      return;
+    }
+
+    const bookingId = Number.parseInt(
+      triggerButton.getAttribute("data-booking-id") || "0",
+      10,
+    );
+    const bookingDisplayId =
+      triggerButton.getAttribute("data-booking-display-id") || "#N/A";
+    const customerName =
+      triggerButton.getAttribute("data-booking-customer-name") || "Unknown";
+    const customerPhone =
+      triggerButton.getAttribute("data-booking-customer-phone") || "N/A";
+    const customerEmail =
+      triggerButton.getAttribute("data-booking-customer-email") || "N/A";
+    const driverId =
+      triggerButton.getAttribute("data-booking-driver-id") || "N/A";
+    const vehicleName =
+      triggerButton.getAttribute("data-booking-vehicle-name") || "Vehicle";
+    const vehicleType =
+      triggerButton.getAttribute("data-booking-vehicle-type") || "car";
+    const vehicleStatusKey = (
+      triggerButton.getAttribute("data-booking-vehicle-status") || "unknown"
+    ).toLowerCase();
+    const vehicleStatusLabel =
+      triggerButton.getAttribute("data-booking-vehicle-status-label") ||
+      toTitleCase(vehicleStatusKey.replace("_", " "));
+    const vehicleImage =
+      triggerButton.getAttribute("data-booking-vehicle-image") ||
+      "images/vehicle-feature.png";
+    const pickupDate =
+      triggerButton.getAttribute("data-booking-pickup-date") || "N/A";
+    const returnDate =
+      triggerButton.getAttribute("data-booking-return-date") || "N/A";
+    const returnTimeDisplay =
+      triggerButton.getAttribute("data-booking-return-time-display") || "N/A";
+    const scheduledReturnDatetime =
+      triggerButton.getAttribute("data-booking-return-datetime") || "";
+    const paymentStatusLabel =
+      triggerButton.getAttribute("data-booking-payment-label") || "N/A";
+    const paymentStatusIcon =
+      triggerButton.getAttribute("data-booking-payment-icon") || "help";
+    const paymentStatusClass =
+      triggerButton.getAttribute("data-booking-payment-class") ||
+      "admin-bookings__payment--unknown";
+    const pricePerDay = Number.parseFloat(
+      triggerButton.getAttribute("data-booking-price-per-day") || "0",
+    );
+    const durationDays = Number.parseInt(
+      triggerButton.getAttribute("data-booking-duration-days") || "1",
+      10,
+    );
+    const durationLabel =
+      triggerButton.getAttribute("data-booking-duration-label") ||
+      "Price for 1 day";
+    const durationPrice = Number.parseFloat(
+      triggerButton.getAttribute("data-booking-duration-price") || "0",
+    );
+    const dropCharge = Number.parseFloat(
+      triggerButton.getAttribute("data-booking-drop-charge") || "0",
+    );
+    const existingLateFee = Number.parseFloat(
+      triggerButton.getAttribute("data-booking-late-fee") || "0",
+    );
+    const lateFeeNotApplicable = readBookingBoolean(
+      triggerButton,
+      "data-booking-late-fee-na",
+    );
+    const taxesFees = Number.parseFloat(
+      triggerButton.getAttribute("data-booking-taxes-fees") || "0",
+    );
+    const billingTotal = Number.parseFloat(
+      triggerButton.getAttribute("data-booking-billing-total") || "0",
+    );
+    const returnTimeInputValue =
+      triggerButton.getAttribute("data-booking-return-time-input") ||
+      toDateTimeLocalInputValue(scheduledReturnDatetime);
+    const trackPickupLocation = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-pickup-location"),
+    );
+    const trackReturnLocation = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-return-location"),
+    );
+    const trackLocationLabel = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-location-label"),
+    );
+    const trackRiskLabel = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-risk-label"),
+    );
+    const trackRiskPercent = String(
+      triggerButton.getAttribute("data-booking-track-risk-percent") || "",
+    ).trim();
+    const trackSafetyScore = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-safety-score"),
+    );
+    const trackSafetyLabel = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-safety-label"),
+      "",
+    );
+    const trackMapUrl = String(
+      triggerButton.getAttribute("data-booking-track-map-url") || "",
+    ).trim();
+    const trackLatitude = parseTrackCoordinate(
+      triggerButton.getAttribute("data-booking-gps-latitude"),
+    );
+    const trackLongitude = parseTrackCoordinate(
+      triggerButton.getAttribute("data-booking-gps-longitude"),
+    );
+    const trackHasSignal =
+      hasTrackGpsSignal(trackLatitude, trackLongitude) ||
+      readBookingBoolean(triggerButton, "data-booking-track-has-signal");
+
+    const canTrack = readBookingBoolean(
+      triggerButton,
+      "data-booking-can-track",
+    );
+    const isTrackDisabled = readBookingBoolean(
+      triggerButton,
+      "data-booking-track-disabled",
+    );
+    const canCompleteReturn = readBookingBoolean(
+      triggerButton,
+      "data-booking-can-complete",
+    );
+    const canApproveCancellation = readBookingBoolean(
+      triggerButton,
+      "data-booking-can-approve-cancellation",
+    );
+    const canDelete = readBookingBoolean(
+      triggerButton,
+      "data-booking-can-delete",
+    );
+
+    if (adminBookingReadNumberNode instanceof HTMLElement) {
+      adminBookingReadNumberNode.textContent = bookingDisplayId;
+    }
+
+    if (adminBookingReadCustomerNode instanceof HTMLElement) {
+      adminBookingReadCustomerNode.textContent = customerName;
+    }
+
+    if (adminBookingReadPaymentBadgeNode instanceof HTMLElement) {
+      const sanitizedPaymentClass = bookingPaymentClassOptions.includes(
+        paymentStatusClass,
+      )
+        ? paymentStatusClass
+        : "admin-bookings__payment--unknown";
+      adminBookingReadPaymentBadgeNode.className =
+        "admin-booking-read-modal__payment admin-bookings__payment";
+      adminBookingReadPaymentBadgeNode.classList.add(sanitizedPaymentClass);
+    }
+
+    if (adminBookingReadPaymentIconNode instanceof HTMLElement) {
+      adminBookingReadPaymentIconNode.textContent = paymentStatusIcon;
+    }
+
+    if (adminBookingReadPaymentLabelNode instanceof HTMLElement) {
+      adminBookingReadPaymentLabelNode.textContent = paymentStatusLabel;
+    }
+
+    if (adminBookingReadStatusPill instanceof HTMLElement) {
+      const statusPillKey = [
+        "available",
+        "unavailable",
+        "reserved",
+        "on_trip",
+        "overdue",
+        "maintenance",
+        "ready",
+      ].includes(vehicleStatusKey)
+        ? vehicleStatusKey
+        : "available";
+
+      const normalizedVehicleStatusLabel =
+        String(vehicleStatusLabel || "").trim() ||
+        (statusPillKey === "unavailable" ? "Unavailable" : "Available");
+
+      adminBookingReadStatusPill.textContent = normalizedVehicleStatusLabel;
+      adminBookingReadStatusPill.className = `admin-booking-read-modal__status-pill admin-booking-read-modal__status-pill--${statusPillKey.replace("_", "-")}`;
+    }
+
+    if (adminBookingReadImage instanceof HTMLImageElement) {
+      adminBookingReadImage.src = vehicleImage;
+      adminBookingReadImage.alt = vehicleName;
+    }
+
+    if (adminBookingReadVehicleTypeNode instanceof HTMLElement) {
+      adminBookingReadVehicleTypeNode.textContent = toTitleCase(
+        String(vehicleType).replace(/s$/, ""),
+      );
+    }
+
+    if (adminBookingReadVehicleNameNode instanceof HTMLElement) {
+      adminBookingReadVehicleNameNode.textContent = vehicleName;
+    }
+
+    if (adminBookingReadCustomerPhoneNode instanceof HTMLElement) {
+      adminBookingReadCustomerPhoneNode.textContent = customerPhone || "N/A";
+    }
+
+    if (adminBookingReadCustomerEmailNode instanceof HTMLElement) {
+      adminBookingReadCustomerEmailNode.textContent = customerEmail || "N/A";
+    }
+
+    if (adminBookingReadDriverIdNode instanceof HTMLElement) {
+      adminBookingReadDriverIdNode.textContent = driverId || "N/A";
+    }
+
+    if (adminBookingReadPickupDateNode instanceof HTMLElement) {
+      adminBookingReadPickupDateNode.textContent = pickupDate;
+    }
+
+    if (adminBookingReadReturnDateNode instanceof HTMLElement) {
+      adminBookingReadReturnDateNode.textContent = returnDate;
+    }
+
+    if (adminBookingReadReturnTimeNode instanceof HTMLElement) {
+      adminBookingReadReturnTimeNode.textContent = returnTimeDisplay;
+    }
+
+    if (adminBookingReadPricePerDayNode instanceof HTMLElement) {
+      adminBookingReadPricePerDayNode.textContent =
+        formatBookingCurrency(pricePerDay);
+    }
+
+    if (adminBookingReadDurationLabelNode instanceof HTMLElement) {
+      const normalizedDays =
+        Number.isFinite(durationDays) && durationDays > 0 ? durationDays : 1;
+      adminBookingReadDurationLabelNode.textContent =
+        durationLabel ||
+        (normalizedDays === 1
+          ? "Price for 1 day"
+          : `Price for ${normalizedDays} days`);
+    }
+
+    if (adminBookingReadDurationPriceNode instanceof HTMLElement) {
+      adminBookingReadDurationPriceNode.textContent =
+        formatBookingCurrency(durationPrice);
+    }
+
+    if (adminBookingReadDropChargeNode instanceof HTMLElement) {
+      adminBookingReadDropChargeNode.textContent =
+        formatBookingCurrency(dropCharge);
+    }
+
+    if (adminBookingReadLateFeeNode instanceof HTMLElement) {
+      adminBookingReadLateFeeNode.textContent =
+        lateFeeNotApplicable && !canCompleteReturn
+          ? "N/A"
+          : formatBookingCurrency(existingLateFee);
+    }
+
+    if (adminBookingReadTaxesFeesNode instanceof HTMLElement) {
+      adminBookingReadTaxesFeesNode.textContent =
+        formatBookingCurrency(taxesFees);
+    }
+
+    if (adminBookingReadBillingTotalNode instanceof HTMLElement) {
+      adminBookingReadBillingTotalNode.textContent =
+        formatBookingCurrency(billingTotal);
+    }
+
+    if (adminBookingCompleteIdInput instanceof HTMLInputElement) {
+      adminBookingCompleteIdInput.value =
+        bookingId > 0 ? String(bookingId) : "";
+    }
+
+    if (adminBookingReturnTimeInput instanceof HTMLInputElement) {
+      adminBookingReturnTimeInput.value = returnTimeInputValue;
+      adminBookingReturnTimeInput.required = canCompleteReturn;
+
+      if (adminBookingReturnTimeInput._flatpickr) {
+        const parsedReturnDate = parseDateTimeValue(returnTimeInputValue);
+        if (parsedReturnDate instanceof Date) {
+          adminBookingReturnTimeInput._flatpickr.setDate(
+            parsedReturnDate,
+            false,
+          );
+        } else {
+          adminBookingReturnTimeInput._flatpickr.clear();
+        }
+      }
+    }
+
+    if (adminBookingCompleteForm instanceof HTMLElement) {
+      adminBookingCompleteForm.hidden = !canCompleteReturn;
+    }
+
+    if (adminBookingCompleteSubmit instanceof HTMLButtonElement) {
+      adminBookingCompleteSubmit.disabled = !canCompleteReturn;
+      adminBookingCompleteSubmit.hidden = !canCompleteReturn;
+    }
+
+    if (adminBookingLateFeePreview instanceof HTMLElement) {
+      adminBookingLateFeePreview.hidden = !canCompleteReturn;
+    }
+
+    if (adminBookingTrackAction instanceof HTMLElement) {
+      adminBookingTrackAction.hidden = !canTrack;
+
+      if (!canTrack) {
+        adminBookingTrackAction.classList.remove("is-disabled");
+        adminBookingTrackAction.removeAttribute("aria-disabled");
+        adminBookingTrackAction.removeAttribute("tabindex");
+      } else if (isTrackDisabled) {
+        adminBookingTrackAction.classList.add("is-disabled");
+        adminBookingTrackAction.setAttribute("aria-disabled", "true");
+        adminBookingTrackAction.setAttribute("tabindex", "-1");
+      } else {
+        adminBookingTrackAction.classList.remove("is-disabled");
+        adminBookingTrackAction.removeAttribute("aria-disabled");
+        adminBookingTrackAction.removeAttribute("tabindex");
+
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-number",
+          bookingDisplayId,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-customer",
+          customerName,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-location",
+          "Unavailable",
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-pickup",
+          trackPickupLocation,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-return",
+          trackReturnLocation,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-return-risk-label",
+          trackRiskLabel,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-return-risk-percent",
+          trackRiskPercent,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-risk-label",
+          trackRiskLabel,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-risk-percent",
+          trackRiskPercent,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-safety-score",
+          trackSafetyScore,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-safety-label",
+          trackSafetyLabel,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-map-url",
+          trackMapUrl,
+        );
+        adminBookingTrackAction.setAttribute(
+          "data-booking-track-has-signal",
+          trackHasSignal ? "true" : "false",
+        );
+        if (trackLatitude !== null) {
+          adminBookingTrackAction.setAttribute(
+            "data-booking-track-latitude",
+            String(trackLatitude),
+          );
+        } else {
+          adminBookingTrackAction.removeAttribute(
+            "data-booking-track-latitude",
+          );
+        }
+
+        if (trackLongitude !== null) {
+          adminBookingTrackAction.setAttribute(
+            "data-booking-track-longitude",
+            String(trackLongitude),
+          );
+        } else {
+          adminBookingTrackAction.removeAttribute(
+            "data-booking-track-longitude",
+          );
+        }
+      }
+    }
+
+    if (adminBookingApproveIdInput instanceof HTMLInputElement) {
+      adminBookingApproveIdInput.value = bookingId > 0 ? String(bookingId) : "";
+    }
+
+    if (adminBookingApproveForm instanceof HTMLElement) {
+      adminBookingApproveForm.hidden = !canApproveCancellation;
+    }
+
+    if (adminBookingApproveAction instanceof HTMLButtonElement) {
+      adminBookingApproveAction.disabled = !canApproveCancellation;
+    }
+
+    if (adminBookingDeleteAction instanceof HTMLElement) {
+      adminBookingDeleteAction.hidden = !canDelete;
+      adminBookingDeleteAction.setAttribute(
+        "data-delete-booking-id",
+        bookingId > 0 ? String(bookingId) : "",
+      );
+      adminBookingDeleteAction.setAttribute(
+        "data-delete-booking-label",
+        bookingDisplayId,
+      );
+    }
+
+    bookingReadContext = {
+      scheduledReturnDatetime,
+      durationPrice: Number.isFinite(durationPrice) ? durationPrice : 0,
+      dropCharge: Number.isFinite(dropCharge) ? dropCharge : 0,
+      taxRate: 0.13,
+      allowLateFeePreview: canCompleteReturn,
+    };
+
+    if (canCompleteReturn) {
+      updateBookingLateFeePreview();
+    } else if (adminBookingLateFeePreview instanceof HTMLElement) {
+      adminBookingLateFeePreview.textContent = lateFeeNotApplicable
+        ? "Late fee: N/A"
+        : `Late fee: ${formatBookingCurrency(existingLateFee)}`;
+      adminBookingLateFeePreview.hidden = true;
+    }
+  };
+
+  const hydrateBookingTrackModal = (triggerButton) => {
+    if (!(triggerButton instanceof HTMLElement)) {
+      return;
+    }
+
+    const trackNumber = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-number"),
+      "#N/A",
+    );
+    const trackCustomer = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-customer"),
+      "Unknown",
+    );
+    const trackLocation = "Unavailable";
+    const trackPickup = "Unavailable";
+    const trackReturn = "Unavailable";
+    const trackReturnRiskLabel = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-return-risk-label"),
+      normalizeTrackText(
+        triggerButton.getAttribute("data-booking-track-risk-label"),
+      ),
+    );
+    const trackReturnRiskPercent = String(
+      triggerButton.getAttribute("data-booking-track-return-risk-percent") ||
+        triggerButton.getAttribute("data-booking-track-risk-percent") ||
+        "",
+    ).trim();
+    const trackRiskLabel = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-risk-label"),
+    );
+    const trackRiskPercent = String(
+      triggerButton.getAttribute("data-booking-track-risk-percent") || "",
+    ).trim();
+    const trackSafetyScore = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-safety-score"),
+    );
+    const trackSafetyLabel = normalizeTrackText(
+      triggerButton.getAttribute("data-booking-track-safety-label"),
+      "",
+    );
+    const trackMapUrl = String(
+      triggerButton.getAttribute("data-booking-track-map-url") || "",
+    ).trim();
+    const hasSignal = readBookingBoolean(
+      triggerButton,
+      "data-booking-track-has-signal",
+    );
+
+    if (adminBookingTrackNumberNode instanceof HTMLElement) {
+      adminBookingTrackNumberNode.textContent = trackNumber;
+    }
+
+    if (adminBookingTrackCustomerNode instanceof HTMLElement) {
+      adminBookingTrackCustomerNode.textContent = trackCustomer;
+    }
+
+    if (adminBookingTrackLocationLabelNode instanceof HTMLElement) {
+      adminBookingTrackLocationLabelNode.textContent = trackLocation;
+    }
+
+    if (adminBookingTrackPickupLocationNode instanceof HTMLElement) {
+      adminBookingTrackPickupLocationNode.textContent = trackPickup;
+    }
+
+    if (adminBookingTrackReturnLocationNode instanceof HTMLElement) {
+      adminBookingTrackReturnLocationNode.textContent = trackReturn;
+    }
+
+    if (adminBookingTrackRiskLabelNode instanceof HTMLElement) {
+      adminBookingTrackRiskLabelNode.textContent = trackRiskLabel;
+      adminBookingTrackRiskLabelNode.classList.remove(
+        "is-high",
+        "is-moderate",
+        "is-low",
+      );
+
+      const riskClass = normalizeTrackRiskClass(trackRiskLabel);
+      if (riskClass !== "") {
+        adminBookingTrackRiskLabelNode.classList.add(riskClass);
+      }
+    }
+
+    if (adminBookingTrackRiskPercentNode instanceof HTMLElement) {
+      adminBookingTrackRiskPercentNode.textContent =
+        trackRiskPercent !== "" ? `${trackRiskPercent}%` : "";
+      adminBookingTrackRiskPercentNode.classList.remove(
+        "is-high",
+        "is-moderate",
+        "is-low",
+      );
+
+      const riskClass = normalizeTrackRiskClass(trackRiskLabel);
+      if (trackRiskPercent !== "" && riskClass !== "") {
+        adminBookingTrackRiskPercentNode.classList.add(riskClass);
+      }
+    }
+
+    if (adminBookingTrackReturnRiskLabelNode instanceof HTMLElement) {
+      adminBookingTrackReturnRiskLabelNode.textContent = trackReturnRiskLabel;
+      adminBookingTrackReturnRiskLabelNode.classList.remove(
+        "is-high",
+        "is-moderate",
+        "is-low",
+      );
+
+      const riskClass = normalizeTrackRiskClass(trackReturnRiskLabel);
+      if (riskClass !== "") {
+        adminBookingTrackReturnRiskLabelNode.classList.add(riskClass);
+      }
+    }
+
+    if (adminBookingTrackReturnRiskPercentNode instanceof HTMLElement) {
+      adminBookingTrackReturnRiskPercentNode.textContent =
+        trackReturnRiskPercent !== "" ? `${trackReturnRiskPercent}%` : "";
+      adminBookingTrackReturnRiskPercentNode.classList.remove(
+        "is-high",
+        "is-moderate",
+        "is-low",
+      );
+
+      const riskClass = normalizeTrackRiskClass(trackReturnRiskLabel);
+      if (trackReturnRiskPercent !== "" && riskClass !== "") {
+        adminBookingTrackReturnRiskPercentNode.classList.add(riskClass);
+      }
+    }
+
+    if (adminBookingTrackSafetyScoreNode instanceof HTMLElement) {
+      adminBookingTrackSafetyScoreNode.textContent = trackSafetyScore;
+    }
+
+    if (adminBookingTrackSafetyLabelNode instanceof HTMLElement) {
+      adminBookingTrackSafetyLabelNode.textContent = trackSafetyLabel;
+      adminBookingTrackSafetyLabelNode.classList.remove(
+        "is-high",
+        "is-moderate",
+        "is-low",
+      );
+
+      const safetyClass = normalizeTrackSafetyClass(trackSafetyLabel);
+      if (safetyClass !== "") {
+        adminBookingTrackSafetyLabelNode.classList.add(safetyClass);
+      }
+    }
+
+    const hasMapTarget = hasSignal && trackMapUrl !== "";
+    if (adminBookingTrackOpenMapsAction instanceof HTMLAnchorElement) {
+      if (hasMapTarget) {
+        adminBookingTrackOpenMapsAction.href = trackMapUrl;
+        adminBookingTrackOpenMapsAction.classList.remove("is-disabled");
+        adminBookingTrackOpenMapsAction.removeAttribute("aria-disabled");
+        adminBookingTrackOpenMapsAction.removeAttribute("tabindex");
+      } else {
+        adminBookingTrackOpenMapsAction.href = "#";
+        adminBookingTrackOpenMapsAction.classList.add("is-disabled");
+        adminBookingTrackOpenMapsAction.setAttribute("aria-disabled", "true");
+        adminBookingTrackOpenMapsAction.setAttribute("tabindex", "-1");
+      }
+    }
+
+    if (adminBookingTrackMapEmptyNode instanceof HTMLElement) {
+      adminBookingTrackMapEmptyNode.hidden = hasSignal;
+    }
+
+    if (adminBookingTrackRouteNode instanceof HTMLElement) {
+      adminBookingTrackRouteNode.hidden = !hasSignal;
+    }
+
+    if (adminBookingTrackPickupPinNode instanceof HTMLElement) {
+      adminBookingTrackPickupPinNode.hidden = !hasSignal;
+    }
+
+    if (adminBookingTrackReturnPinNode instanceof HTMLElement) {
+      adminBookingTrackReturnPinNode.hidden = !hasSignal;
+    }
+  };
+
+  const hydrateDeleteBookingModal = (triggerButton) => {
+    if (!(triggerButton instanceof HTMLElement)) {
+      return;
+    }
+
+    const bookingId = Number.parseInt(
+      triggerButton.getAttribute("data-delete-booking-id") ||
+        triggerButton.getAttribute("data-booking-id") ||
+        "0",
+      10,
+    );
+    const bookingLabel =
+      triggerButton.getAttribute("data-delete-booking-label") ||
+      triggerButton.getAttribute("data-booking-display-id") ||
+      "this booking";
+
+    if (adminDeleteBookingIdInput instanceof HTMLInputElement) {
+      adminDeleteBookingIdInput.value =
+        Number.isFinite(bookingId) && bookingId > 0 ? String(bookingId) : "";
+    }
+
+    if (adminDeleteBookingNameNode instanceof HTMLElement) {
+      adminDeleteBookingNameNode.textContent = bookingLabel;
+    }
   };
 
   // maintenance edit/fillup form: populate create modal with currently selected available vehicle context.
@@ -1629,6 +2758,10 @@
 
     const bookingNumber =
       triggerButton.getAttribute("data-read-booking-number") || "";
+    const bookingId = Number.parseInt(
+      triggerButton.getAttribute("data-read-booking-id") || "0",
+      10,
+    );
     const bookingUserName =
       triggerButton.getAttribute("data-read-booking-user-name") || "";
     const bookingUserPhone =
@@ -1644,8 +2777,33 @@
     const latitude = triggerButton.getAttribute("data-read-gps-latitude") || "";
     const longitude =
       triggerButton.getAttribute("data-read-gps-longitude") || "";
-    const currentLocation =
-      latitude !== "" && longitude !== "" ? `${latitude}, ${longitude}` : "";
+    const parsedLatitude = Number.parseFloat(String(latitude).trim());
+    const parsedLongitude = Number.parseFloat(String(longitude).trim());
+    const hasGpsSignal =
+      Number.isFinite(parsedLatitude) &&
+      Number.isFinite(parsedLongitude) &&
+      (Math.abs(parsedLatitude) > 0.00001 ||
+        Math.abs(parsedLongitude) > 0.00001);
+    const currentLocation = hasGpsSignal
+      ? `${parsedLatitude.toFixed(6)}, ${parsedLongitude.toFixed(6)}`
+      : "";
+
+    const resolvedBookingNumber =
+      !isReadValueMissing(bookingNumber) ||
+      !Number.isFinite(bookingId) ||
+      bookingId <= 0
+        ? bookingNumber
+        : `#BK-${String(bookingId).padStart(4, "0")}`;
+
+    const hasBookingTimelineData =
+      !isReadValueMissing(resolvedBookingNumber) ||
+      !isReadValueMissing(pickupDatetime) ||
+      !isReadValueMissing(returnDatetime) ||
+      !isReadValueMissing(paymentStatus);
+    const resolvedVehicleStatus =
+      readUserStatuses.includes(vehicleStatus) && !hasBookingTimelineData
+        ? "available"
+        : vehicleStatus;
 
     const details = {
       lastServiceDate: vehicleLastServiceDate,
@@ -1671,11 +2829,11 @@
       currentLocation,
     };
 
-    const isUserStatus = readUserStatuses.includes(vehicleStatus);
+    const isUserStatus = readUserStatuses.includes(resolvedVehicleStatus);
 
     if (adminReadBookingNumberNode instanceof HTMLElement) {
       adminReadBookingNumberNode.textContent = isUserStatus
-        ? normalizeReadValue(bookingNumber, vehicleStatus, true)
+        ? normalizeReadValue(resolvedBookingNumber, resolvedVehicleStatus, true)
         : readUserNotApplicableText;
     }
 
@@ -1688,29 +2846,29 @@
       if (!isUserStatus) {
         adminReadCurrentUserNode.textContent = "";
       } else {
-        const hasFullUserDetails =
-          !isReadValueMissing(bookingUserName) &&
-          !isReadValueMissing(bookingUserPhone);
-        adminReadCurrentUserNode.textContent = hasFullUserDetails
-          ? `${String(bookingUserName).trim()} ${String(bookingUserPhone).trim()}`
-          : readUnavailableText;
+        const userDetails = [bookingUserName, bookingUserPhone]
+          .map((value) => String(value || "").trim())
+          .filter((value) => value !== "");
+        adminReadCurrentUserNode.textContent =
+          userDetails.length > 0 ? userDetails.join(" ") : readUnavailableText;
       }
     }
 
     if (adminReadStatusPill instanceof HTMLElement) {
       adminReadStatusPill.textContent =
-        readStatusLabels[vehicleStatus] || "Available";
-      adminReadStatusPill.className = `admin-vehicle-read-modal__status-pill admin-vehicle-read-modal__status-pill--${vehicleStatus.replace("_", "-")}`;
+        readStatusLabels[resolvedVehicleStatus] || "Available";
+      adminReadStatusPill.className = `admin-vehicle-read-modal__status-pill admin-vehicle-read-modal__status-pill--${resolvedVehicleStatus.replace("_", "-")}`;
     }
 
     if (adminReadMaintenanceIndicator instanceof HTMLElement) {
       const showMaintenanceIndicator =
-        fleetModeForReadModal === "type" && vehicleStatus === "available";
+        fleetModeForReadModal === "type" &&
+        resolvedVehicleStatus === "available";
       adminReadMaintenanceIndicator.hidden = !showMaintenanceIndicator;
     }
 
     if (adminReadEditAction instanceof HTMLButtonElement) {
-      const canEditMaintenance = vehicleStatus === "maintenance";
+      const canEditMaintenance = resolvedVehicleStatus === "maintenance";
       adminReadEditAction.hidden = !(
         fleetModeForReadModal === "type" || canEditMaintenance
       );
@@ -1758,7 +2916,7 @@
       );
       adminReadEditAction.setAttribute(
         "data-edit-vehicle-status",
-        vehicleStatus,
+        resolvedVehicleStatus,
       );
       adminReadEditAction.setAttribute(
         "data-edit-vehicle-last-service",
@@ -1782,7 +2940,8 @@
       );
       adminReadEditAction.setAttribute(
         "data-delete-fleet-status",
-        triggerButton.getAttribute("data-delete-fleet-status") || vehicleStatus,
+        triggerButton.getAttribute("data-delete-fleet-status") ||
+          resolvedVehicleStatus,
       );
     }
 
@@ -1802,7 +2961,11 @@
     }
 
     if (adminReadVehicleSeatsNode instanceof HTMLElement) {
-      const seatsValue = normalizeReadValue(vehicleSeats, vehicleStatus, false);
+      const seatsValue = normalizeReadValue(
+        vehicleSeats,
+        resolvedVehicleStatus,
+        false,
+      );
       adminReadVehicleSeatsNode.textContent =
         seatsValue === readUnavailableText
           ? readUnavailableText
@@ -1811,14 +2974,14 @@
 
     if (adminReadVehicleTransmissionNode instanceof HTMLElement) {
       adminReadVehicleTransmissionNode.textContent = toTitleCase(
-        normalizeReadValue(vehicleTransmission, vehicleStatus, false),
+        normalizeReadValue(vehicleTransmission, resolvedVehicleStatus, false),
       );
     }
 
     if (adminReadVehicleAgeNode instanceof HTMLElement) {
       const ageValue = normalizeReadValue(
         vehicleDriverAge,
-        vehicleStatus,
+        resolvedVehicleStatus,
         false,
       );
       adminReadVehicleAgeNode.textContent =
@@ -1829,23 +2992,24 @@
 
     if (adminReadVehicleFuelNode instanceof HTMLElement) {
       adminReadVehicleFuelNode.textContent = toTitleCase(
-        normalizeReadValue(vehicleFuel, vehicleStatus, false),
+        normalizeReadValue(vehicleFuel, resolvedVehicleStatus, false),
       );
     }
 
     if (adminReadVehiclePlateNode instanceof HTMLElement) {
       adminReadVehiclePlateNode.textContent = normalizeReadValue(
         vehicleLicensePlate,
-        vehicleStatus,
+        resolvedVehicleStatus,
         false,
       );
     }
 
-    updateReadStatusRows(vehicleStatus, details);
+    updateReadStatusRows(resolvedVehicleStatus, details);
 
     if (adminReadDeleteAction instanceof HTMLElement) {
       const canDeleteFromReadModal =
-        fleetModeForReadModal === "type" && vehicleStatus === "available";
+        fleetModeForReadModal === "type" &&
+        resolvedVehicleStatus === "available";
       adminReadDeleteAction.hidden = !canDeleteFromReadModal;
       adminReadDeleteAction.setAttribute(
         "data-delete-vehicle-id",
@@ -1871,7 +3035,7 @@
 
     readModalContext = {
       vehicleId,
-      vehicleStatus,
+      vehicleStatus: resolvedVehicleStatus,
       fleetMode: fleetModeForReadModal,
       fleetType: triggerButton.getAttribute("data-delete-fleet-type") || "cars",
       fleetStatus:
@@ -1991,6 +3155,7 @@
     clearAdminLoginUiState();
     resetCreateVehicleModal();
     resetEditVehicleModal();
+    resetBookingReadModal();
 
     if (lastFocusedElement instanceof HTMLElement) {
       lastFocusedElement.focus({ preventScroll: true });
@@ -2058,6 +3223,18 @@
         hydrateDeleteVehicleModal(button);
       }
 
+      if (targetId === "admin-booking-read-modal") {
+        hydrateBookingReadModal(button);
+      }
+
+      if (targetId === "admin-booking-track-modal") {
+        hydrateBookingTrackModal(button);
+      }
+
+      if (targetId === "admin-delete-booking-modal") {
+        hydrateDeleteBookingModal(button);
+      }
+
       if (targetId === "admin-maintenance-fill-modal") {
         hydrateMaintenanceFillModal(button);
       }
@@ -2117,6 +3294,56 @@
 
   if (adminEditImageInput instanceof HTMLInputElement) {
     adminEditImageInput.addEventListener("change", updateEditImageUi);
+  }
+
+  initAdminBookingReturnTimePicker();
+
+  if (adminBookingReturnTimeInput instanceof HTMLInputElement) {
+    adminBookingReturnTimeInput.addEventListener(
+      "input",
+      updateBookingLateFeePreview,
+    );
+    adminBookingReturnTimeInput.addEventListener(
+      "change",
+      updateBookingLateFeePreview,
+    );
+  }
+
+  if (adminBookingTrackAction instanceof HTMLElement) {
+    adminBookingTrackAction.addEventListener("click", (event) => {
+      if (adminBookingTrackAction.classList.contains("is-disabled")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    });
+  }
+
+  if (adminBookingReturnTimeInput instanceof HTMLInputElement) {
+    adminBookingReturnTimePickerButtons.forEach((pickerButton) => {
+      if (!(pickerButton instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      pickerButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (adminBookingReturnTimeInput._flatpickr) {
+          adminBookingReturnTimeInput._flatpickr.open();
+          return;
+        }
+
+        adminBookingReturnTimeInput.focus({ preventScroll: true });
+        if (typeof adminBookingReturnTimeInput.showPicker === "function") {
+          try {
+            adminBookingReturnTimeInput.showPicker();
+            return;
+          } catch (error) {}
+        }
+
+        adminBookingReturnTimeInput.click();
+      });
+    });
   }
 
   if (
@@ -2268,5 +3495,14 @@
     lastFocusedElement = autoOpenReadTrigger;
     hydrateReadVehicleModal(autoOpenReadTrigger);
     showModal("admin-vehicle-read-modal", true);
+  }
+
+  const autoOpenBookingTrigger = document.querySelector(
+    "[data-modal-target='admin-booking-read-modal'][data-auto-open-booking='true']",
+  );
+  if (autoOpenBookingTrigger instanceof HTMLElement) {
+    lastFocusedElement = autoOpenBookingTrigger;
+    hydrateBookingReadModal(autoOpenBookingTrigger);
+    showModal("admin-booking-read-modal", true);
   }
 })();

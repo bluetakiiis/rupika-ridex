@@ -15,11 +15,3 @@
 Thumbs.db
 data/vehicles-json/.vehicles-sync.lock
 data/vehicles-json/.vehicles-sync-state.json
-
-# Render/Docker deployment-only files (keep local, do not track)
-Dockerfile
-docker/
-.githooks/
-data/deploy/
-bin/export_db_snapshot.php
-bin/import_db_snapshot.php

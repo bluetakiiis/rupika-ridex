@@ -78,9 +78,10 @@ $footerIsAdminPage = str_starts_with($footerCurrentPage, 'admin');
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr" defer></script>
-<script src="js/app.js?v=20260403-2" defer></script>
-<script src="js/booking.js?v=20260402-5" defer></script>
+<script src="js/app.js?v=20260406-15" defer></script>
+<script src="js/booking.js?v=20260406-2" defer></script>
 <?php if ($footerIsAdminPage): ?>
-	<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-	<script src="js/admin-dashboard.js?v=20260404-1" defer></script>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+	<script src="js/admin-dashboard.js?v=20260406-3" defer></script>
+	<script src="js/admin-bookings-search.js?v=20260406-3" defer></script>
 <?php endif; ?>

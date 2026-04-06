@@ -12,13 +12,12 @@ $districtOptions = [
 	'Koshi',
 	'Madhesh',
 	'Bagmati',
-	'Gandaki',
 	'Lumbini',
 	'Karnali',
 	'Sudurpashchim',
 ];
 
-
+?>
 <section class="auth-register" aria-labelledby="register-title">
 	<h1 id="register-title">Create Account</h1>
 	<form method="post" action="/register" novalidate>

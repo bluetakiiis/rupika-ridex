@@ -121,6 +121,163 @@ $isAdminUpdateVehiclePost =
 	$_SERVER['REQUEST_METHOD'] === 'POST'
 	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'admin-update-vehicle';
 
+$isAdminCompleteBookingPost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'admin-complete-booking';
+
+$isAdminApproveBookingCancellationPost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'admin-approve-booking-cancellation';
+
+$isAdminDeleteBookingPost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'admin-delete-booking';
+
+$ensureVehicleSoftDeleteColumn = static function (PDO $pdo): void {
+	static $checked = false;
+	if ($checked) {
+		return;
+	}
+	$checked = true;
+
+	try {
+		$columnCheckStmt = $pdo->query(
+			"SELECT COUNT(*)
+			 FROM INFORMATION_SCHEMA.COLUMNS
+			 WHERE TABLE_SCHEMA = DATABASE()
+				AND TABLE_NAME = 'vehicles'
+				AND COLUMN_NAME = 'deleted_at'"
+		);
+		$hasDeletedAtColumn = (int) $columnCheckStmt->fetchColumn() > 0;
+
+		if (!$hasDeletedAtColumn) {
+			$pdo->exec('ALTER TABLE vehicles ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER updated_at');
+		}
+	} catch (Throwable $exception) {
+		error_log('Ensure vehicles.deleted_at column failed: ' . $exception->getMessage());
+	}
+};
+
+$ensureGpsLogsTable = static function (PDO $pdo): void {
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS gps_logs (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			vehicle_id INT NOT NULL,
+			timestamp DATETIME NOT NULL,
+			latitude DECIMAL(9,6) NOT NULL,
+			longitude DECIMAL(9,6) NOT NULL,
+			speed DECIMAL(5,2) NULL,
+			heading DECIMAL(5,2) NULL,
+			fuel_level DECIMAL(5,2) NULL,
+			safety_score DECIMAL(5,2) NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			CONSTRAINT fk_gpslogs_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
+			INDEX idx_vehicle_timestamp (vehicle_id, timestamp)
+		)'
+	);
+};
+
+$ensurePaymentsTable = static function (PDO $pdo): void {
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS payments (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			booking_id INT NOT NULL,
+			amount INT NOT NULL,
+			method ENUM("khalti","cash") NOT NULL,
+			status ENUM("initiated","pending","success","failed","cancelled","refunded") NOT NULL,
+			transaction_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			pidx VARCHAR(100),
+			provider_response LONGTEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			CONSTRAINT fk_payments_booking FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+			CHECK (provider_response IS NULL OR JSON_VALID(provider_response))
+		)'
+	);
+};
+
+$ensureVehicleGpsCoverage = static function () use ($ensureGpsLogsTable): void {
+	try {
+		$pdo = db();
+		$ensureGpsLogsTable($pdo);
+
+		$vehicleRows = $pdo->query('SELECT id, gps_id FROM vehicles ORDER BY id ASC')->fetchAll() ?: [];
+		if (empty($vehicleRows)) {
+			return;
+		}
+
+		$existingGpsVehicleIds = $pdo->query('SELECT DISTINCT vehicle_id FROM gps_logs')->fetchAll(PDO::FETCH_COLUMN);
+		$gpsVehicleLookup = [];
+		foreach ($existingGpsVehicleIds as $gpsVehicleId) {
+			$gpsVehicleLookup[(int) $gpsVehicleId] = true;
+		}
+
+		$updateGpsIdStmt = $pdo->prepare(
+			'UPDATE vehicles
+			 SET gps_id = :gps_id,
+				 updated_at = CURRENT_TIMESTAMP
+			 WHERE id = :id'
+		);
+
+		$insertPlaceholderGpsStmt = $pdo->prepare(
+			'INSERT INTO gps_logs (
+				vehicle_id,
+				timestamp,
+				latitude,
+				longitude,
+				speed,
+				heading,
+				fuel_level,
+				safety_score
+			) VALUES (
+				:vehicle_id,
+				CURRENT_TIMESTAMP,
+				:latitude,
+				:longitude,
+				NULL,
+				NULL,
+				NULL,
+				NULL
+			)'
+		);
+
+		$pdo->beginTransaction();
+
+		foreach ($vehicleRows as $vehicleRow) {
+			$vehicleId = (int) ($vehicleRow['id'] ?? 0);
+			if ($vehicleId <= 0) {
+				continue;
+			}
+
+			$targetGpsId = 'GP-' . $vehicleId;
+			$currentGpsId = trim((string) ($vehicleRow['gps_id'] ?? ''));
+			if ($currentGpsId !== $targetGpsId) {
+				$updateGpsIdStmt->execute([
+					'gps_id' => $targetGpsId,
+					'id' => $vehicleId,
+				]);
+			}
+
+			if (!isset($gpsVehicleLookup[$vehicleId])) {
+				$insertPlaceholderGpsStmt->execute([
+					'vehicle_id' => $vehicleId,
+					'latitude' => 0,
+					'longitude' => 0,
+				]);
+				$gpsVehicleLookup[$vehicleId] = true;
+			}
+		}
+
+		$pdo->commit();
+	} catch (Throwable $exception) {
+		if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+
+		error_log('Vehicle GPS normalization failed: ' . $exception->getMessage());
+	}
+};
+
 if ($isAdminLogoutPost) {
 	unset($_SESSION['auth_user'], $_SESSION['admin_login_flash']);
 	session_regenerate_id(true);
@@ -174,6 +331,7 @@ if ($isAdminDeleteVehiclePost) {
 	if ($deleteVehicleId > 0) {
 		try {
 			$pdo = db();
+			$ensureVehicleSoftDeleteColumn($pdo);
 			$mirrorVehicleJsonFiles($legacyVehicleJsonSyncDir, $vehicleJsonSyncDir);
 
 			// Ensure sync state exists before delete so DB-side deletion is detected as an intentional remove.
@@ -182,10 +340,49 @@ if ($isAdminDeleteVehiclePost) {
 				'prefer_db_timestamps' => true,
 			]);
 
-			$deleteVehicleStmt = $pdo->prepare('DELETE FROM vehicles WHERE id = :id LIMIT 1');
-			$deleteVehicleStmt->execute([
+			$pdo->beginTransaction();
+
+			$linkedBookingsStmt = $pdo->prepare(
+				'SELECT
+					COUNT(*) AS linked_count,
+					SUM(
+						CASE
+							WHEN status IN ("reserved", "on_trip", "overdue")
+								AND return_time IS NULL
+							THEN 1
+							ELSE 0
+						END
+					) AS active_count
+				 FROM bookings
+				 WHERE vehicle_id = :vehicle_id
+				 FOR UPDATE'
+			);
+			$linkedBookingsStmt->execute([
+				'vehicle_id' => $deleteVehicleId,
+			]);
+			$linkedBookings = $linkedBookingsStmt->fetch() ?: [];
+			$activeLinkedBookingCount = (int) ($linkedBookings['active_count'] ?? 0);
+
+			if ($activeLinkedBookingCount > 0) {
+				$pdo->rollBack();
+				header('Location: ' . $deleteRedirectUrl, true, 303);
+				exit;
+			}
+
+			$softDeleteVehicleStmt = $pdo->prepare(
+				'UPDATE vehicles
+				 SET status = :status,
+					 deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP),
+					 updated_at = CURRENT_TIMESTAMP
+				 WHERE id = :id
+				 LIMIT 1'
+			);
+			$softDeleteVehicleStmt->execute([
+				'status' => 'maintenance',
 				'id' => $deleteVehicleId,
 			]);
+
+			$pdo->commit();
 
 			// Keep JSON source aligned with DB delete so sync does not restore removed rows.
 			sync_vehicles_json_bidirectional($pdo, $vehicleJsonSyncDir, [
@@ -194,11 +391,273 @@ if ($isAdminDeleteVehiclePost) {
 			]);
 			$mirrorVehicleJsonFiles($vehicleJsonSyncDir, $legacyVehicleJsonSyncDir);
 		} catch (Throwable $exception) {
+			if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+				$pdo->rollBack();
+			}
+
 			error_log('Admin vehicle delete failed: ' . $exception->getMessage());
 		}
 	}
 
 	header('Location: ' . $deleteRedirectUrl, true, 303);
+	exit;
+}
+
+// admin booking modal actions: complete return, approve cancellation, and guarded delete from all-bookings view.
+if ($isAdminCompleteBookingPost || $isAdminApproveBookingCancellationPost || $isAdminDeleteBookingPost) {
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');
+
+	if (!$isAdminSession) {
+		header('Location: index.php', true, 302);
+		exit;
+	}
+
+	$bookingId = (int) ($_POST['booking_id'] ?? 0);
+	$redirectQuery = ['page' => 'admin-all-bookings'];
+	if ($bookingId > 0 && !$isAdminDeleteBookingPost) {
+		$redirectQuery['open_booking_id'] = $bookingId;
+	}
+	$redirectUrl = 'index.php?' . http_build_query($redirectQuery);
+
+	if ($bookingId <= 0) {
+		header('Location: ' . $redirectUrl, true, 303);
+		exit;
+	}
+
+	$parseAdminDateTime = static function ($rawDate): ?DateTimeImmutable {
+		$rawDate = trim((string) $rawDate);
+		if ($rawDate === '') {
+			return null;
+		}
+
+		$formats = [
+			'Y-m-d\TH:i:s',
+			'Y-m-d\TH:i',
+			'Y-m-d H:i:s',
+			'Y-m-d H:i',
+		];
+
+		foreach ($formats as $format) {
+			$parsedDate = DateTimeImmutable::createFromFormat($format, $rawDate);
+			$errors = DateTimeImmutable::getLastErrors();
+			$hasDateErrors = is_array($errors)
+				&& ((int) ($errors['warning_count'] ?? 0) > 0 || (int) ($errors['error_count'] ?? 0) > 0);
+
+			if ($parsedDate instanceof DateTimeImmutable && !$hasDateErrors) {
+				return $parsedDate;
+			}
+		}
+
+		try {
+			return new DateTimeImmutable($rawDate);
+		} catch (Throwable $exception) {
+			return null;
+		}
+	};
+
+	try {
+		$pdo = db();
+		$pdo->beginTransaction();
+
+		$bookingLookupStmt = $pdo->prepare(
+			'SELECT
+				b.id,
+				b.vehicle_id,
+				b.status,
+				b.payment_status,
+				b.payment_method,
+				b.pickup_datetime,
+				b.return_datetime,
+				b.return_time,
+				b.total_amount,
+				b.paid_amount,
+				b.late_fee
+			 FROM bookings b
+			 WHERE b.id = :id
+			 LIMIT 1
+			 FOR UPDATE'
+		);
+		$bookingLookupStmt->execute([
+			'id' => $bookingId,
+		]);
+		$bookingRow = $bookingLookupStmt->fetch();
+
+		if (!is_array($bookingRow)) {
+			$pdo->rollBack();
+			header('Location: ' . $redirectUrl, true, 303);
+			exit;
+		}
+
+		$bookingStatus = strtolower(trim((string) ($bookingRow['status'] ?? '')));
+		$paymentStatus = strtolower(trim((string) ($bookingRow['payment_status'] ?? '')));
+		$paymentMethod = strtolower(trim((string) ($bookingRow['payment_method'] ?? '')));
+		$pickupDateTime = $parseAdminDateTime($bookingRow['pickup_datetime'] ?? null);
+		$scheduledReturnDateTime = $parseAdminDateTime($bookingRow['return_datetime'] ?? null);
+		$nowDateTime = new DateTimeImmutable('now');
+
+		$effectiveBookingStatus = $bookingStatus;
+		if (!in_array($bookingStatus, ['completed', 'cancelled'], true)) {
+			if ($scheduledReturnDateTime instanceof DateTimeImmutable && $nowDateTime > $scheduledReturnDateTime) {
+				$effectiveBookingStatus = 'overdue';
+			} elseif ($bookingStatus === 'reserved' && $pickupDateTime instanceof DateTimeImmutable && $nowDateTime >= $pickupDateTime) {
+				$effectiveBookingStatus = 'on_trip';
+			}
+		}
+
+		$vehicleId = (int) ($bookingRow['vehicle_id'] ?? 0);
+
+		if ($isAdminCompleteBookingPost) {
+			if (!in_array($effectiveBookingStatus, ['on_trip', 'overdue'], true)) {
+				$pdo->rollBack();
+				header('Location: ' . $redirectUrl, true, 303);
+				exit;
+			}
+
+			$returnTimeInput = trim((string) ($_POST['return_time'] ?? ''));
+			if ($returnTimeInput === '') {
+				$pdo->rollBack();
+				header('Location: ' . $redirectUrl, true, 303);
+				exit;
+			}
+
+			$actualReturnDateTime = $parseAdminDateTime($returnTimeInput);
+			if (!($actualReturnDateTime instanceof DateTimeImmutable)) {
+				$pdo->rollBack();
+				header('Location: ' . $redirectUrl, true, 303);
+				exit;
+			}
+
+			$lateHours = 0;
+			if ($scheduledReturnDateTime instanceof DateTimeImmutable && $actualReturnDateTime > $scheduledReturnDateTime) {
+				$lateSeconds = $actualReturnDateTime->getTimestamp() - $scheduledReturnDateTime->getTimestamp();
+				$lateHours = (int) floor($lateSeconds / 3600);
+				if ($lateHours < 0) {
+					$lateHours = 0;
+				}
+			}
+			$lateFee = $lateHours * 10;
+
+			$nextPaymentStatus = $paymentStatus;
+			if (!in_array($nextPaymentStatus, ['paid', 'refunded'], true)) {
+				$nextPaymentStatus = 'paid';
+			}
+
+			$nextPaidAmount = (int) ($bookingRow['paid_amount'] ?? 0);
+			if ($nextPaymentStatus === 'paid') {
+				$minimumPaidAmount = (int) ($bookingRow['total_amount'] ?? 0);
+				if ($paymentMethod === 'pay_on_arrival') {
+					$minimumPaidAmount += $lateFee;
+				}
+
+				if ($nextPaidAmount < $minimumPaidAmount) {
+					$nextPaidAmount = $minimumPaidAmount;
+				}
+			}
+
+			$completeBookingStmt = $pdo->prepare(
+				'UPDATE bookings
+				 SET status = :status,
+					 payment_status = :payment_status,
+					 paid_amount = :paid_amount,
+					 return_time = :return_time,
+					 late_fee = :late_fee,
+					 updated_at = CURRENT_TIMESTAMP
+				 WHERE id = :id'
+			);
+			$completeBookingStmt->execute([
+				'status' => 'completed',
+				'payment_status' => $nextPaymentStatus,
+				'paid_amount' => $nextPaidAmount,
+				'return_time' => $actualReturnDateTime->format('Y-m-d H:i:s'),
+				'late_fee' => $lateFee,
+				'id' => $bookingId,
+			]);
+		}
+
+		if ($isAdminApproveBookingCancellationPost) {
+			if ($bookingStatus !== 'cancelled') {
+				$pdo->rollBack();
+				header('Location: ' . $redirectUrl, true, 303);
+				exit;
+			}
+
+			$nextPaymentStatus = $paymentStatus;
+			if ($paymentMethod === 'khalti' && in_array($paymentStatus, ['paid', 'cancelled', 'pending'], true)) {
+				$nextPaymentStatus = 'refunded';
+			} elseif ($paymentMethod === 'pay_on_arrival' && in_array($paymentStatus, ['paid', 'cancelled', 'pending', 'unpaid'], true)) {
+				$nextPaymentStatus = 'unpaid';
+			} elseif ($paymentStatus === 'cancelled') {
+				$nextPaymentStatus = 'refunded';
+			} elseif ($paymentStatus === 'pending') {
+				$nextPaymentStatus = 'unpaid';
+			}
+
+			if ($nextPaymentStatus !== $paymentStatus) {
+				$nextPaidAmount = (int) ($bookingRow['paid_amount'] ?? 0);
+				if ($nextPaymentStatus === 'unpaid') {
+					$nextPaidAmount = 0;
+				}
+
+				$approveCancellationStmt = $pdo->prepare(
+					'UPDATE bookings
+					 SET payment_status = :payment_status,
+						 paid_amount = :paid_amount,
+						 updated_at = CURRENT_TIMESTAMP
+					 WHERE id = :id'
+				);
+				$approveCancellationStmt->execute([
+					'payment_status' => $nextPaymentStatus,
+					'paid_amount' => $nextPaidAmount,
+					'id' => $bookingId,
+				]);
+			}
+		}
+
+		if ($isAdminDeleteBookingPost) {
+			$hasReturnTime = trim((string) ($bookingRow['return_time'] ?? '')) !== '';
+			$canDeleteCancelledBooking = $bookingStatus === 'cancelled'
+				&& in_array($paymentStatus, ['refunded', 'unpaid'], true);
+			$canDeleteBooking = $bookingStatus === 'completed' || $hasReturnTime || $canDeleteCancelledBooking;
+
+			if (!$canDeleteBooking) {
+				$pdo->rollBack();
+				header('Location: ' . $redirectUrl, true, 303);
+				exit;
+			}
+
+			$deleteBookingStmt = $pdo->prepare('DELETE FROM bookings WHERE id = :id LIMIT 1');
+			$deleteBookingStmt->execute([
+				'id' => $bookingId,
+			]);
+
+			$redirectUrl = 'index.php?page=admin-all-bookings';
+		}
+
+		if ($vehicleId > 0 && ($isAdminCompleteBookingPost || $isAdminApproveBookingCancellationPost || $isAdminDeleteBookingPost)) {
+			$setVehicleAvailableStmt = $pdo->prepare(
+				'UPDATE vehicles
+				 SET status = :status,
+					 updated_at = CURRENT_TIMESTAMP
+				 WHERE id = :id
+				 LIMIT 1'
+			);
+			$setVehicleAvailableStmt->execute([
+				'status' => 'available',
+				'id' => $vehicleId,
+			]);
+		}
+
+		$pdo->commit();
+	} catch (Throwable $exception) {
+		if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+
+		error_log('Admin booking action failed: ' . $exception->getMessage());
+	}
+
+	header('Location: ' . $redirectUrl, true, 303);
 	exit;
 }
 
@@ -1379,8 +1838,616 @@ $runVehicleSync = static function (bool $preferDbTimestamps = false) use (
 	}
 };
 
+$syncBookingLifecycleStatuses = static function (): void {
+	try {
+		$pdo = db();
+
+		$statusCaseSql = 'CASE
+			WHEN b.status IN ("completed", "cancelled") THEN b.status
+			WHEN b.return_time IS NOT NULL THEN "completed"
+			WHEN CURRENT_TIMESTAMP > b.return_datetime THEN "overdue"
+			WHEN CURRENT_TIMESTAMP >= b.pickup_datetime THEN "on_trip"
+			ELSE "reserved"
+		END';
+
+		$syncStatusSql = 'UPDATE bookings b
+			SET status = ' . $statusCaseSql . ',
+				updated_at = CURRENT_TIMESTAMP
+			WHERE b.status <> ' . $statusCaseSql;
+
+		$pdo->exec($syncStatusSql);
+
+		$calculatedTotalSql = 'GREATEST(
+			0,
+			ROUND(
+				(
+					(GREATEST(1, CEIL(TIMESTAMPDIFF(MINUTE, b.pickup_datetime, b.return_datetime) / 1440)) * v.price_per_day)
+					+ 20
+					+ GREATEST(0, b.late_fee)
+				) * 1.13,
+				0
+			)
+		)';
+
+		$syncTotalsSql = 'UPDATE bookings b
+			INNER JOIN vehicles v ON v.id = b.vehicle_id
+			SET b.total_amount = ' . $calculatedTotalSql . ',
+				b.updated_at = CURRENT_TIMESTAMP
+			WHERE b.total_amount <> ' . $calculatedTotalSql;
+
+		$pdo->exec($syncTotalsSql);
+
+		$paymentCaseSql = 'CASE
+			WHEN status = "cancelled" AND payment_method = "khalti" THEN
+				CASE
+					WHEN payment_status = "refunded" THEN "refunded"
+					WHEN payment_status IN ("paid", "pending", "cancelled") THEN "cancelled"
+					ELSE payment_status
+				END
+			WHEN status = "cancelled" AND payment_method = "pay_on_arrival" THEN
+				CASE
+					WHEN payment_status = "paid" THEN "cancelled"
+					WHEN payment_status IN ("pending", "cancelled", "unpaid") THEN payment_status
+					ELSE payment_status
+				END
+			WHEN status IN ("on_trip", "overdue", "completed") THEN "paid"
+			WHEN payment_method = "khalti" THEN "paid"
+			WHEN payment_method = "pay_on_arrival" THEN "pending"
+			ELSE payment_status
+		END';
+
+		$syncPaymentSql = 'UPDATE bookings
+			SET payment_status = ' . $paymentCaseSql . ',
+				updated_at = CURRENT_TIMESTAMP
+			WHERE payment_status <> ' . $paymentCaseSql;
+
+		$pdo->exec($syncPaymentSql);
+
+		$paidAmountCaseSql = 'CASE
+			WHEN payment_status = "paid" THEN GREATEST(paid_amount, total_amount)
+			WHEN payment_method = "pay_on_arrival" AND payment_status IN ("pending", "unpaid", "cancelled") THEN 0
+			ELSE paid_amount
+		END';
+
+		$syncPaidAmountSql = 'UPDATE bookings
+			SET paid_amount = ' . $paidAmountCaseSql . ',
+				updated_at = CURRENT_TIMESTAMP
+			WHERE paid_amount <> ' . $paidAmountCaseSql;
+
+		$pdo->exec($syncPaidAmountSql);
+	} catch (Throwable $exception) {
+		// Keep routing available even if booking sync fails.
+		error_log('Booking lifecycle/payment sync failed: ' . $exception->getMessage());
+	}
+};
+
+$syncBookingUsersAndPayments = static function () use ($ensurePaymentsTable): void {
+	try {
+		$pdo = db();
+		$ensurePaymentsTable($pdo);
+
+		$bookingRows = $pdo->query(
+			'SELECT
+				id,
+				user_id,
+				payment_method,
+				payment_status,
+				total_amount,
+				paid_amount,
+				return_time,
+				created_at,
+				updated_at
+			 FROM bookings
+			 ORDER BY id ASC'
+		)->fetchAll() ?: [];
+
+		if (empty($bookingRows)) {
+			return;
+		}
+
+		$bookingUserIds = [];
+		foreach ($bookingRows as $bookingRow) {
+			$bookingUserId = (int) ($bookingRow['user_id'] ?? 0);
+			if ($bookingUserId > 0) {
+				$bookingUserIds[] = $bookingUserId;
+			}
+		}
+		$bookingUserIds = array_values(array_unique($bookingUserIds));
+		sort($bookingUserIds);
+
+		$existingUsersById = [];
+		if (!empty($bookingUserIds)) {
+			$userPlaceholders = implode(',', array_fill(0, count($bookingUserIds), '?'));
+			$userLookupStmt = $pdo->prepare(
+				'SELECT
+					id,
+					name,
+					first_name,
+					last_name,
+					email,
+					password_hash,
+					phone,
+					address,
+					date_of_birth,
+					street,
+					post_code,
+					city,
+					province,
+					role,
+					drivers_id
+				 FROM users
+				 WHERE id IN (' . $userPlaceholders . ')'
+			);
+			$userLookupStmt->execute($bookingUserIds);
+			foreach (($userLookupStmt->fetchAll() ?: []) as $userRow) {
+				$existingUsersById[(int) ($userRow['id'] ?? 0)] = $userRow;
+			}
+		}
+
+		$usedEmails = [];
+		$emailRows = $pdo->query('SELECT id, email FROM users ORDER BY id ASC')->fetchAll() ?: [];
+		foreach ($emailRows as $emailRow) {
+			$emailValue = strtolower(trim((string) ($emailRow['email'] ?? '')));
+			if ($emailValue !== '' && filter_var($emailValue, FILTER_VALIDATE_EMAIL)) {
+				$usedEmails[$emailValue] = (int) ($emailRow['id'] ?? 0);
+			}
+		}
+
+		$allowedProvinces = ['Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'];
+
+		$sanitizeEmailBase = static function (string $rawValue): string {
+			$normalized = strtolower(trim($rawValue));
+			$normalized = preg_replace('/[^a-z0-9]+/', '.', $normalized);
+			$normalized = is_string($normalized) ? trim($normalized, '.') : '';
+			if ($normalized === '') {
+				$normalized = 'ridex.user';
+			}
+
+			return $normalized;
+		};
+
+		$buildStrongPassword = static function (int $userId): string {
+			return 'RidexUser#' . max(1, $userId) . 'Aa';
+		};
+
+		$isStrongPassword = static function (string $password): bool {
+			if (strlen($password) < 10) {
+				return false;
+			}
+
+			$hasLower = preg_match('/[a-z]/', $password) === 1;
+			$hasUpper = preg_match('/[A-Z]/', $password) === 1;
+			$hasDigit = preg_match('/\d/', $password) === 1;
+			$hasSpecial = preg_match('/[^a-zA-Z\d]/', $password) === 1;
+
+			return $hasLower && $hasUpper && $hasDigit && $hasSpecial;
+		};
+
+		$generateUniqueGmail = static function (string $name, int $userId) use (&$usedEmails, $sanitizeEmailBase): string {
+			$emailBase = $sanitizeEmailBase($name);
+			$candidateEmail = $emailBase . '.ridex' . $userId . '@gmail.com';
+			$counter = 1;
+
+			while (isset($usedEmails[$candidateEmail])) {
+				$candidateEmail = $emailBase . '.ridex' . $userId . '.' . $counter . '@gmail.com';
+				$counter += 1;
+			}
+
+			$usedEmails[$candidateEmail] = $userId;
+			return $candidateEmail;
+		};
+
+		$normalizePhoneDigits = static function (string $rawPhone, int $userId): string {
+			$digits = preg_replace('/\D+/', '', $rawPhone);
+			$digits = is_string($digits) ? $digits : '';
+
+			if (strlen($digits) < 10) {
+				$digits = '98' . str_pad((string) ($userId % 100000000), 8, '0', STR_PAD_LEFT);
+			}
+
+			if (strlen($digits) > 10) {
+				$digits = substr($digits, -10);
+			}
+
+			return $digits;
+		};
+
+		$upsertUserStmt = $pdo->prepare(
+			'INSERT INTO users (
+				id,
+				name,
+				first_name,
+				last_name,
+				email,
+				password_hash,
+				phone,
+				address,
+				date_of_birth,
+				street,
+				post_code,
+				city,
+				province,
+				role,
+				drivers_id,
+				created_at,
+				updated_at
+			) VALUES (
+				:id,
+				:name,
+				:first_name,
+				:last_name,
+				:email,
+				:password_hash,
+				:phone,
+				:address,
+				:date_of_birth,
+				:street,
+				:post_code,
+				:city,
+				:province,
+				:role,
+				:drivers_id,
+				CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP
+			)
+			ON DUPLICATE KEY UPDATE
+				name = VALUES(name),
+				first_name = VALUES(first_name),
+				last_name = VALUES(last_name),
+				email = VALUES(email),
+				password_hash = VALUES(password_hash),
+				phone = VALUES(phone),
+				address = VALUES(address),
+				date_of_birth = VALUES(date_of_birth),
+				street = VALUES(street),
+				post_code = VALUES(post_code),
+				city = VALUES(city),
+				province = VALUES(province),
+				role = VALUES(role),
+				drivers_id = VALUES(drivers_id),
+				updated_at = CURRENT_TIMESTAMP'
+		);
+
+		$mapPaymentMethod = static function (string $bookingMethod): string {
+			$bookingMethod = strtolower(trim($bookingMethod));
+			return $bookingMethod === 'khalti' ? 'khalti' : 'cash';
+		};
+
+		$mapPaymentStatus = static function (string $bookingPaymentStatus, string $paymentMethod): string {
+			$bookingPaymentStatus = strtolower(trim($bookingPaymentStatus));
+
+			if ($bookingPaymentStatus === 'paid') {
+				return 'success';
+			}
+
+			if ($bookingPaymentStatus === 'pending') {
+				return 'pending';
+			}
+
+			if ($bookingPaymentStatus === 'cancelled') {
+				return 'cancelled';
+			}
+
+			if ($bookingPaymentStatus === 'refunded') {
+				return 'refunded';
+			}
+
+			if ($bookingPaymentStatus === 'unpaid') {
+				return $paymentMethod === 'khalti' ? 'pending' : 'initiated';
+			}
+
+			return 'failed';
+		};
+
+		$insertPaymentStmt = $pdo->prepare(
+			'INSERT INTO payments (
+				booking_id,
+				amount,
+				method,
+				status,
+				transaction_time,
+				pidx,
+				provider_response,
+				created_at,
+				updated_at
+			) VALUES (
+				:booking_id,
+				:amount,
+				:method,
+				:status,
+				:transaction_time,
+				NULL,
+				:provider_response,
+				CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP
+			)'
+		);
+
+		$updatePaymentStmt = $pdo->prepare(
+			'UPDATE payments
+			 SET amount = :amount,
+				 method = :method,
+				 status = :status,
+				 transaction_time = :transaction_time,
+				 provider_response = :provider_response,
+				 updated_at = CURRENT_TIMESTAMP
+			 WHERE id = :id
+			 LIMIT 1'
+		);
+
+		$pdo->beginTransaction();
+
+		foreach ($bookingUserIds as $bookingUserId) {
+			$existingUser = $existingUsersById[$bookingUserId] ?? [];
+			$existingRole = strtolower(trim((string) ($existingUser['role'] ?? 'user')));
+			if ($existingRole === 'admin') {
+				continue;
+			}
+
+			$userName = trim((string) ($existingUser['name'] ?? ''));
+			if ($userName === '') {
+				$userName = 'Ridex User ' . $bookingUserId;
+			}
+
+			$firstName = trim((string) ($existingUser['first_name'] ?? ''));
+			$lastName = trim((string) ($existingUser['last_name'] ?? ''));
+			$nameParts = preg_split('/\s+/', $userName) ?: [];
+
+			if ($firstName === '') {
+				$firstName = trim((string) ($nameParts[0] ?? 'Ridex'));
+			}
+
+			if ($lastName === '') {
+				$lastName = trim((string) (count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : 'User'));
+			}
+
+			if ($firstName === '') {
+				$firstName = 'Ridex';
+			}
+
+			if ($lastName === '') {
+				$lastName = 'User';
+			}
+
+			$userName = trim($firstName . ' ' . $lastName);
+
+			$currentEmail = strtolower(trim((string) ($existingUser['email'] ?? '')));
+			$currentEmailIsValid = $currentEmail !== '' && filter_var($currentEmail, FILTER_VALIDATE_EMAIL);
+			$currentEmailOwnerId = $currentEmailIsValid ? (int) ($usedEmails[$currentEmail] ?? 0) : 0;
+
+			$emailNeedsRefresh = !$currentEmailIsValid
+				|| !str_ends_with($currentEmail, '@gmail.com')
+				|| ($currentEmailOwnerId > 0 && $currentEmailOwnerId !== $bookingUserId);
+
+			if ($emailNeedsRefresh) {
+				$finalEmail = $generateUniqueGmail($userName, $bookingUserId);
+			} else {
+				$finalEmail = $currentEmail;
+				$usedEmails[$finalEmail] = $bookingUserId;
+			}
+
+			$passwordHash = trim((string) ($existingUser['password_hash'] ?? ''));
+			$generatedPassword = $buildStrongPassword($bookingUserId);
+			$legacyGeneratedPassword = 'RidexUser!' . max(1, $bookingUserId) . 'Aa';
+			if (!$isStrongPassword($generatedPassword)) {
+				$generatedPassword = 'RidexUser#' . max(1, $bookingUserId) . 'A1';
+			}
+
+			$passwordNeedsRefresh = $passwordHash === '' || $emailNeedsRefresh;
+			if (!$passwordNeedsRefresh && $passwordHash !== '') {
+				$matchesCurrentPattern = password_verify($generatedPassword, $passwordHash);
+				$matchesLegacyPattern = password_verify($legacyGeneratedPassword, $passwordHash);
+				if (!$matchesCurrentPattern && $matchesLegacyPattern) {
+					$passwordNeedsRefresh = true;
+				}
+			}
+
+			if ($passwordNeedsRefresh) {
+				$passwordHash = password_hash($generatedPassword, PASSWORD_DEFAULT);
+			}
+
+			$cityValue = trim((string) ($existingUser['city'] ?? ''));
+			if ($cityValue === '') {
+				$cityValue = 'Kathmandu';
+			}
+
+			$streetValue = trim((string) ($existingUser['street'] ?? ''));
+			if ($streetValue === '') {
+				$streetValue = 'Street ' . str_pad((string) $bookingUserId, 3, '0', STR_PAD_LEFT);
+			}
+
+			$postCodeValue = trim((string) ($existingUser['post_code'] ?? ''));
+			if ($postCodeValue === '') {
+				$postCodeValue = '44600';
+			}
+
+			$addressValue = trim((string) ($existingUser['address'] ?? ''));
+			if ($addressValue === '') {
+				$addressValue = $streetValue . ', ' . $cityValue;
+			}
+
+			$provinceValue = trim((string) ($existingUser['province'] ?? ''));
+			if (!in_array($provinceValue, $allowedProvinces, true)) {
+				$provinceValue = 'Bagmati';
+			}
+
+			$dateOfBirthValue = trim((string) ($existingUser['date_of_birth'] ?? ''));
+			$validDateOfBirth = DateTimeImmutable::createFromFormat('Y-m-d', $dateOfBirthValue) instanceof DateTimeImmutable;
+			if (!$validDateOfBirth) {
+				$dateOfBirthValue = (new DateTimeImmutable('now'))
+					->sub(new DateInterval('P' . (22 + ($bookingUserId % 12)) . 'Y'))
+					->format('Y-m-d');
+			}
+
+			$driversIdValue = trim((string) ($existingUser['drivers_id'] ?? ''));
+			if ($driversIdValue === '') {
+				$driversIdValue = 'RIDEX-' . str_pad((string) $bookingUserId, 6, '0', STR_PAD_LEFT);
+			}
+
+			$phoneValue = $normalizePhoneDigits((string) ($existingUser['phone'] ?? ''), $bookingUserId);
+
+			$upsertUserStmt->execute([
+				'id' => $bookingUserId,
+				'name' => $userName,
+				'first_name' => $firstName,
+				'last_name' => $lastName,
+				'email' => $finalEmail,
+				'password_hash' => $passwordHash,
+				'phone' => $phoneValue,
+				'address' => $addressValue,
+				'date_of_birth' => $dateOfBirthValue,
+				'street' => $streetValue,
+				'post_code' => $postCodeValue,
+				'city' => $cityValue,
+				'province' => $provinceValue,
+				'role' => 'user',
+				'drivers_id' => $driversIdValue,
+			]);
+		}
+
+		$existingPaymentRows = $pdo->query(
+			'SELECT id, booking_id
+			 FROM payments
+			 ORDER BY booking_id ASC, id DESC'
+		)->fetchAll() ?: [];
+
+		$latestPaymentByBooking = [];
+		$stalePaymentIds = [];
+		foreach ($existingPaymentRows as $paymentRow) {
+			$paymentId = (int) ($paymentRow['id'] ?? 0);
+			$bookingId = (int) ($paymentRow['booking_id'] ?? 0);
+			if ($paymentId <= 0 || $bookingId <= 0) {
+				continue;
+			}
+
+			if (!isset($latestPaymentByBooking[$bookingId])) {
+				$latestPaymentByBooking[$bookingId] = $paymentId;
+			} else {
+				$stalePaymentIds[] = $paymentId;
+			}
+		}
+
+		foreach ($bookingRows as $bookingRow) {
+			$bookingId = (int) ($bookingRow['id'] ?? 0);
+			if ($bookingId <= 0) {
+				continue;
+			}
+
+			$paymentMethod = $mapPaymentMethod((string) ($bookingRow['payment_method'] ?? ''));
+			$paymentStatus = $mapPaymentStatus((string) ($bookingRow['payment_status'] ?? ''), $paymentMethod);
+
+			$paidAmount = (int) ($bookingRow['paid_amount'] ?? 0);
+			$totalAmount = (int) ($bookingRow['total_amount'] ?? 0);
+			$transactionAmount = $paidAmount > 0 ? $paidAmount : $totalAmount;
+			if ($transactionAmount < 0) {
+				$transactionAmount = 0;
+			}
+
+			$transactionTime = trim((string) ($bookingRow['return_time'] ?? ''));
+			if ($transactionTime === '') {
+				$transactionTime = trim((string) ($bookingRow['updated_at'] ?? ''));
+			}
+			if ($transactionTime === '') {
+				$transactionTime = trim((string) ($bookingRow['created_at'] ?? ''));
+			}
+			if ($transactionTime === '') {
+				$transactionTime = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+			}
+
+			$providerResponse = json_encode([
+				'source' => 'booking_sync',
+				'booking_id' => $bookingId,
+				'booking_payment_method' => strtolower(trim((string) ($bookingRow['payment_method'] ?? ''))),
+				'booking_payment_status' => strtolower(trim((string) ($bookingRow['payment_status'] ?? ''))),
+				'synced_at' => gmdate(DATE_ATOM),
+			], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+			if (!is_string($providerResponse) || $providerResponse === '') {
+				$providerResponse = '{}';
+			}
+
+			if (isset($latestPaymentByBooking[$bookingId])) {
+				$updatePaymentStmt->execute([
+					'id' => $latestPaymentByBooking[$bookingId],
+					'amount' => $transactionAmount,
+					'method' => $paymentMethod,
+					'status' => $paymentStatus,
+					'transaction_time' => $transactionTime,
+					'provider_response' => $providerResponse,
+				]);
+			} else {
+				$insertPaymentStmt->execute([
+					'booking_id' => $bookingId,
+					'amount' => $transactionAmount,
+					'method' => $paymentMethod,
+					'status' => $paymentStatus,
+					'transaction_time' => $transactionTime,
+					'provider_response' => $providerResponse,
+				]);
+			}
+		}
+
+		if (!empty($stalePaymentIds)) {
+			$stalePlaceholders = implode(',', array_fill(0, count($stalePaymentIds), '?'));
+			$removeStaleStmt = $pdo->prepare('DELETE FROM payments WHERE id IN (' . $stalePlaceholders . ')');
+			$removeStaleStmt->execute($stalePaymentIds);
+		}
+
+		$pdo->exec(
+			'DELETE p
+			 FROM payments p
+			 LEFT JOIN bookings b ON b.id = p.booking_id
+			 WHERE b.id IS NULL'
+		);
+
+		$pdo->commit();
+	} catch (Throwable $exception) {
+		if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+
+		error_log('Booking users/payments sync failed: ' . $exception->getMessage());
+	}
+};
+
+$syncSequentialAutoIncrement = static function (): void {
+	try {
+		$pdo = db();
+		$tables = ['bookings', 'users', 'payments'];
+
+		foreach ($tables as $tableName) {
+			$maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) FROM `' . $tableName . '`');
+			$maxId = (int) $maxIdStmt->fetchColumn();
+			$nextId = $maxId + 1;
+
+			$autoIncrementStmt = $pdo->query(
+				"SELECT COALESCE(AUTO_INCREMENT, 1)
+				 FROM INFORMATION_SCHEMA.TABLES
+				 WHERE TABLE_SCHEMA = DATABASE()
+					AND TABLE_NAME = '" . $tableName . "'"
+			);
+			$currentAutoIncrement = (int) $autoIncrementStmt->fetchColumn();
+
+			if ($currentAutoIncrement !== $nextId) {
+				$pdo->exec('ALTER TABLE `' . $tableName . '` AUTO_INCREMENT = ' . $nextId);
+			}
+		}
+	} catch (Throwable $exception) {
+		error_log('Auto-increment normalization failed: ' . $exception->getMessage());
+	}
+};
+
 // Pull latest changes before read queries.
 $runVehicleSync(false);
+// Ensure soft-delete metadata exists for vehicle visibility and booking history preservation.
+$ensureVehicleSoftDeleteColumn(db());
+// Normalize GPS IDs to GP-{vehicle_id} and seed placeholder gps_logs rows for existing vehicles.
+$ensureVehicleGpsCoverage();
+// Keep DB booking statuses aligned with time-based lifecycle transitions.
+$syncBookingLifecycleStatuses();
+// Keep users/payments connected to current booking records and fill required fields.
+$syncBookingUsersAndPayments();
+// Keep next generated IDs aligned with current max IDs for booking/user records.
+$syncSequentialAutoIncrement();
 // Push website-originated DB changes (create/update/delete) after request handling.
 register_shutdown_function(static function () use ($runVehicleSync): void {
 	$runVehicleSync(true);
@@ -1394,6 +2461,555 @@ $sanitizeVehicleType = static function ($rawType) use ($allowedVehicleTypes): st
 	return in_array($normalizedType, $allowedVehicleTypes, true)
 		? $normalizedType
 		: 'cars';
+};
+
+$getAdminDashboardPayload = static function (): array {
+	$calculatePercentChange = static function (?float $current, ?float $previous): ?float {
+		if ($current === null || $previous === null) {
+			return null;
+		}
+
+		$current = (float) $current;
+		$previous = (float) $previous;
+
+		if (abs($previous) < 0.00001) {
+			if (abs($current) < 0.00001) {
+				return 0.0;
+			}
+
+			// No stable baseline: avoid forcing ±100% when the previous period is zero.
+			return null;
+		}
+
+		return (($current - $previous) / abs($previous)) * 100;
+	};
+
+	$dashboardKpis = [
+		'totalRevenue' => [
+			'value' => null,
+			'trend' => null,
+		],
+		'activeRentals' => [
+			'value' => null,
+			'trend' => null,
+		],
+		'totalFleet' => [
+			'value' => null,
+			'trend' => null,
+		],
+		'fleetAvailability' => [
+			'value' => null,
+			'trend' => null,
+		],
+	];
+
+	$dashboardCharts = [
+		'salesVehicleCategory' => [
+			'labels' => [],
+			'datasets' => [
+				[
+					'label' => 'Cars',
+					'data' => [],
+					'borderColor' => '#f75b7a',
+				],
+				[
+					'label' => 'Bikes',
+					'data' => [],
+					'borderColor' => '#45aaf2',
+				],
+				[
+					'label' => 'Luxury',
+					'data' => [],
+					'borderColor' => '#2db9b0',
+				],
+			],
+		],
+		'mostRentedVehicleCategory' => [
+			'labels' => ['Cars', 'Bikes', 'Luxury'],
+			'datasets' => [
+				[
+					'label' => 'Most Rented',
+					'data' => [0, 0, 0],
+					'backgroundColor' => ['#f75b7a', '#f6a340', '#f4ca55'],
+				],
+			],
+		],
+	];
+
+	try {
+		$pdo = db();
+
+		$fleetStatsStmt = $pdo->query(
+			'SELECT
+				COUNT(*) AS total_fleet,
+				SUM(CASE WHEN status = "available" THEN 1 ELSE 0 END) AS available_fleet
+			 FROM vehicles
+			 WHERE deleted_at IS NULL'
+		);
+		$fleetStats = $fleetStatsStmt->fetch() ?: [];
+		$totalFleet = (int) ($fleetStats['total_fleet'] ?? 0);
+		$availableFleet = (int) ($fleetStats['available_fleet'] ?? 0);
+
+		if ($totalFleet > 0) {
+			$dashboardKpis['totalFleet']['value'] = $totalFleet;
+			$dashboardKpis['fleetAvailability']['value'] = round(($availableFleet / $totalFleet) * 100, 1);
+		}
+
+		$bookingStatsStmt = $pdo->query(
+			'SELECT
+				COUNT(*) AS total_bookings,
+				SUM(CASE WHEN status IN ("reserved", "on_trip", "overdue") THEN 1 ELSE 0 END) AS active_rentals,
+				SUM(CASE WHEN payment_status = "paid" THEN paid_amount ELSE 0 END) AS paid_revenue
+			 FROM bookings'
+		);
+		$bookingStats = $bookingStatsStmt->fetch() ?: [];
+		$totalBookings = (int) ($bookingStats['total_bookings'] ?? 0);
+
+		if ($totalBookings > 0) {
+			$dashboardKpis['activeRentals']['value'] = (int) ($bookingStats['active_rentals'] ?? 0);
+			$dashboardKpis['totalRevenue']['value'] = (float) ($bookingStats['paid_revenue'] ?? 0);
+		}
+
+		$trendEnd = new DateTimeImmutable('now');
+		$trendWindow = new DateInterval('P2D');
+		$currentStart = $trendEnd->sub($trendWindow);
+		$previousStart = $currentStart->sub($trendWindow);
+
+		$periodParams = [
+			'current_start' => $currentStart->format('Y-m-d H:i:s'),
+			'current_end' => $trendEnd->format('Y-m-d H:i:s'),
+			'previous_start' => $previousStart->format('Y-m-d H:i:s'),
+			'previous_end' => $currentStart->format('Y-m-d H:i:s'),
+		];
+
+		$revenueTrendStmt = $pdo->prepare(
+			'SELECT
+				SUM(CASE WHEN pickup_datetime >= :current_start AND pickup_datetime < :current_end AND payment_status = "paid" THEN paid_amount ELSE 0 END) AS current_revenue,
+				SUM(CASE WHEN pickup_datetime >= :previous_start AND pickup_datetime < :previous_end AND payment_status = "paid" THEN paid_amount ELSE 0 END) AS previous_revenue
+			 FROM bookings'
+		);
+		$revenueTrendStmt->execute($periodParams);
+		$revenueTrend = $revenueTrendStmt->fetch() ?: [];
+		$dashboardKpis['totalRevenue']['trend'] = $calculatePercentChange(
+			(float) ($revenueTrend['current_revenue'] ?? 0),
+			(float) ($revenueTrend['previous_revenue'] ?? 0)
+		);
+
+		$activeTrendStmt = $pdo->prepare(
+			'SELECT
+				SUM(CASE WHEN pickup_datetime <= :current_point_start AND COALESCE(return_time, return_datetime) > :current_point_end AND status <> "cancelled" THEN 1 ELSE 0 END) AS current_active,
+				SUM(CASE WHEN pickup_datetime <= :previous_point_start AND COALESCE(return_time, return_datetime) > :previous_point_end AND status <> "cancelled" THEN 1 ELSE 0 END) AS previous_active
+			 FROM bookings'
+		);
+		$activeTrendStmt->execute([
+			'current_point_start' => $periodParams['current_end'],
+			'current_point_end' => $periodParams['current_end'],
+			'previous_point_start' => $periodParams['previous_end'],
+			'previous_point_end' => $periodParams['previous_end'],
+		]);
+		$activeTrend = $activeTrendStmt->fetch() ?: [];
+		$dashboardKpis['activeRentals']['value'] = (int) ($activeTrend['current_active'] ?? 0);
+		$dashboardKpis['activeRentals']['trend'] = $calculatePercentChange(
+			(float) ($activeTrend['current_active'] ?? 0),
+			(float) ($activeTrend['previous_active'] ?? 0)
+		);
+
+		$fleetTrendStmt = $pdo->prepare(
+			'SELECT
+				SUM(CASE WHEN created_at < :fleet_previous_total_cutoff THEN 1 ELSE 0 END) AS previous_fleet,
+				SUM(CASE WHEN created_at < :fleet_previous_available_cutoff AND status = "available" THEN 1 ELSE 0 END) AS previous_available
+			 FROM vehicles
+			 WHERE deleted_at IS NULL'
+		);
+		$fleetTrendStmt->execute([
+			'fleet_previous_total_cutoff' => $periodParams['previous_end'],
+			'fleet_previous_available_cutoff' => $periodParams['previous_end'],
+		]);
+		$fleetTrend = $fleetTrendStmt->fetch() ?: [];
+
+		$currentFleet = (float) $totalFleet;
+		$currentAvailable = (float) $availableFleet;
+		$previousFleet = (float) ($fleetTrend['previous_fleet'] ?? 0);
+		$previousAvailable = (float) ($fleetTrend['previous_available'] ?? 0);
+
+		$dashboardKpis['totalFleet']['trend'] = $calculatePercentChange(
+			$currentFleet,
+			$previousFleet
+		);
+
+		$currentAvailabilityRatio = $currentFleet > 0
+			? ($currentAvailable / $currentFleet) * 100
+			: 0.0;
+		$previousAvailabilityRatio = $previousFleet > 0
+			? ($previousAvailable / $previousFleet) * 100
+			: 0.0;
+		$dashboardKpis['fleetAvailability']['trend'] = $calculatePercentChange($currentAvailabilityRatio, $previousAvailabilityRatio);
+
+		$lineDays = 15;
+		$lineDateKeys = [];
+		$lineLabels = [];
+
+		for ($index = $lineDays - 1; $index >= 0; $index--) {
+			$date = (new DateTimeImmutable('today'))->sub(new DateInterval('P' . $index . 'D'));
+			$dateKey = $date->format('Y-m-d');
+			$lineDateKeys[] = $dateKey;
+			$lineLabels[] = $date->format('M j');
+		}
+
+		$lineIndexByDate = array_flip($lineDateKeys);
+		$lineCars = array_fill(0, $lineDays, 0);
+		$lineBikes = array_fill(0, $lineDays, 0);
+		$lineLuxury = array_fill(0, $lineDays, 0);
+
+		$lineChartStmt = $pdo->prepare(
+			'SELECT
+				DATE(b.pickup_datetime) AS booking_date,
+				v.vehicle_type,
+				COALESCE(SUM(CASE WHEN b.payment_status = "paid" THEN b.paid_amount ELSE b.total_amount END), 0) AS total
+			 FROM bookings b
+			 INNER JOIN vehicles v ON v.id = b.vehicle_id
+			 WHERE b.pickup_datetime >= :line_start
+			 GROUP BY DATE(b.pickup_datetime), v.vehicle_type
+			 ORDER BY booking_date ASC'
+		);
+		$lineChartStmt->execute([
+			'line_start' => $lineDateKeys[0] . ' 00:00:00',
+		]);
+
+		while ($lineRow = $lineChartStmt->fetch()) {
+			$dateKey = (string) ($lineRow['booking_date'] ?? '');
+			$vehicleType = strtolower(trim((string) ($lineRow['vehicle_type'] ?? '')));
+			$total = (float) ($lineRow['total'] ?? 0);
+
+			if (!array_key_exists($dateKey, $lineIndexByDate)) {
+				continue;
+			}
+
+			$targetIndex = (int) $lineIndexByDate[$dateKey];
+			if ($vehicleType === 'cars') {
+				$lineCars[$targetIndex] = $total;
+			} elseif ($vehicleType === 'bikes') {
+				$lineBikes[$targetIndex] = $total;
+			} elseif ($vehicleType === 'luxury') {
+				$lineLuxury[$targetIndex] = $total;
+			}
+		}
+
+		$lineTotal = array_sum($lineCars) + array_sum($lineBikes) + array_sum($lineLuxury);
+		if ($lineTotal <= 0) {
+			$fleetLineStmt = $pdo->prepare(
+				'SELECT
+					DATE(created_at) AS created_date,
+					vehicle_type,
+					COUNT(*) AS total
+				 FROM vehicles
+				 WHERE created_at >= :line_start AND deleted_at IS NULL
+				 GROUP BY DATE(created_at), vehicle_type
+				 ORDER BY created_date ASC'
+			);
+			$fleetLineStmt->execute([
+				'line_start' => $lineDateKeys[0] . ' 00:00:00',
+			]);
+
+			while ($fleetRow = $fleetLineStmt->fetch()) {
+				$dateKey = (string) ($fleetRow['created_date'] ?? '');
+				$vehicleType = strtolower(trim((string) ($fleetRow['vehicle_type'] ?? '')));
+				$total = (int) ($fleetRow['total'] ?? 0);
+
+				if (!array_key_exists($dateKey, $lineIndexByDate)) {
+					continue;
+				}
+
+				$targetIndex = (int) $lineIndexByDate[$dateKey];
+				if ($vehicleType === 'cars') {
+					$lineCars[$targetIndex] = (float) $total;
+				} elseif ($vehicleType === 'bikes') {
+					$lineBikes[$targetIndex] = (float) $total;
+				} elseif ($vehicleType === 'luxury') {
+					$lineLuxury[$targetIndex] = (float) $total;
+				}
+			}
+		}
+
+		$dashboardCharts['salesVehicleCategory']['labels'] = $lineLabels;
+		$dashboardCharts['salesVehicleCategory']['datasets'][0]['data'] = $lineCars;
+		$dashboardCharts['salesVehicleCategory']['datasets'][1]['data'] = $lineBikes;
+		$dashboardCharts['salesVehicleCategory']['datasets'][2]['data'] = $lineLuxury;
+
+		$pieChartStmt = $pdo->query(
+			'SELECT
+				v.vehicle_type,
+				COUNT(*) AS total
+			 FROM bookings b
+			 INNER JOIN vehicles v ON v.id = b.vehicle_id
+			 GROUP BY v.vehicle_type'
+		);
+
+		$pieCounts = [
+			'cars' => 0,
+			'bikes' => 0,
+			'luxury' => 0,
+		];
+
+		while ($pieRow = $pieChartStmt->fetch()) {
+			$type = strtolower(trim((string) ($pieRow['vehicle_type'] ?? '')));
+			if (array_key_exists($type, $pieCounts)) {
+				$pieCounts[$type] = (int) ($pieRow['total'] ?? 0);
+			}
+		}
+
+		$pieTotal = $pieCounts['cars'] + $pieCounts['bikes'] + $pieCounts['luxury'];
+		if ($pieTotal <= 0) {
+			$fleetPieStmt = $pdo->query(
+				'SELECT
+					vehicle_type,
+					COUNT(*) AS total
+				 FROM vehicles
+				 WHERE deleted_at IS NULL
+				 GROUP BY vehicle_type'
+			);
+
+			while ($fleetPieRow = $fleetPieStmt->fetch()) {
+				$type = strtolower(trim((string) ($fleetPieRow['vehicle_type'] ?? '')));
+				if (array_key_exists($type, $pieCounts)) {
+					$pieCounts[$type] = (int) ($fleetPieRow['total'] ?? 0);
+				}
+			}
+		}
+
+		$dashboardCharts['mostRentedVehicleCategory']['datasets'][0]['data'] = [
+			$pieCounts['cars'],
+			$pieCounts['bikes'],
+			$pieCounts['luxury'],
+		];
+	} catch (Throwable $exception) {
+		error_log('Admin dashboard data failed: ' . $exception->getMessage());
+	}
+
+	return [
+		'kpis' => $dashboardKpis,
+		'charts' => $dashboardCharts,
+		'generatedAt' => gmdate(DATE_ATOM),
+	];
+};
+
+$getAdminLiveTrackingPayload = static function (): array {
+	$payload = [
+		'kpis' => [
+			'totalActive' => 0,
+			'averageSafetyScore' => null,
+			'overdueRiskPrediction' => null,
+			'activeOverdue' => 0,
+		],
+		'markers' => [],
+		'generatedAt' => gmdate(DATE_ATOM),
+	];
+
+	$clampPercent = static function (float $value, float $min, float $max): float {
+		if ($value < $min) {
+			return $min;
+		}
+
+		if ($value > $max) {
+			return $max;
+		}
+
+		return $value;
+	};
+
+	try {
+		$trackingRows = db()->query(
+			'    SELECT
+				b.id,
+				b.booking_number,
+				b.status,
+				b.pickup_location,
+				b.return_location,
+				b.return_datetime,
+				u.name AS customer_name,
+				u.phone AS customer_phone,
+				v.id AS vehicle_id,
+				v.gps_id,
+				latest_gps.latitude AS gps_latitude,
+				latest_gps.longitude AS gps_longitude,
+				latest_gps.safety_score AS gps_safety_score
+			 FROM bookings b
+			 LEFT JOIN users u ON u.id = b.user_id
+			 LEFT JOIN vehicles v ON v.id = b.vehicle_id
+			 LEFT JOIN gps_logs latest_gps ON latest_gps.id = (
+				SELECT g1.id
+				FROM gps_logs g1
+				WHERE g1.vehicle_id = b.vehicle_id
+				ORDER BY COALESCE(g1.timestamp, g1.created_at) DESC, g1.id DESC
+				LIMIT 1
+			 )
+			 WHERE b.status IN ("reserved", "on_trip", "overdue")
+			 ORDER BY
+				CASE b.status
+					WHEN "overdue" THEN 0
+					WHEN "on_trip" THEN 1
+					ELSE 2
+				END ASC,
+				b.return_datetime ASC,
+				b.id DESC'
+		)->fetchAll() ?: [];
+
+		$totalActive = count($trackingRows);
+		$payload['kpis']['totalActive'] = $totalActive;
+
+		$overdueCount = 0;
+		$safetyScores = [];
+
+		foreach ($trackingRows as $trackingRow) {
+			$bookingId = (int) ($trackingRow['id'] ?? 0);
+			$vehicleId = (int) ($trackingRow['vehicle_id'] ?? 0);
+			$bookingStatus = strtolower(trim((string) ($trackingRow['status'] ?? 'reserved')));
+			if ($bookingStatus === 'overdue') {
+				$overdueCount += 1;
+			}
+
+			$bookingNumber = trim((string) ($trackingRow['booking_number'] ?? ''));
+			if ($bookingNumber === '') {
+				$bookingNumber = '#BK-' . str_pad((string) max(0, $bookingId), 4, '0', STR_PAD_LEFT);
+			}
+
+			$customerName = trim((string) ($trackingRow['customer_name'] ?? ''));
+			if ($customerName === '') {
+				$customerName = 'Unknown';
+			}
+
+			$customerPhone = trim((string) ($trackingRow['customer_phone'] ?? ''));
+			if ($customerPhone === '') {
+				$customerPhone = 'Unavailable';
+			}
+
+			$gpsLatitude = is_numeric($trackingRow['gps_latitude'] ?? null) ? (float) $trackingRow['gps_latitude'] : null;
+			$gpsLongitude = is_numeric($trackingRow['gps_longitude'] ?? null) ? (float) $trackingRow['gps_longitude'] : null;
+			$hasGpsSignal = $gpsLatitude !== null
+				&& $gpsLongitude !== null
+				&& (abs($gpsLatitude) > 0.00001 || abs($gpsLongitude) > 0.00001);
+
+			$safetyScore = is_numeric($trackingRow['gps_safety_score'] ?? null)
+				? (float) $trackingRow['gps_safety_score']
+				: null;
+			if ($safetyScore !== null) {
+				$safetyScores[] = $safetyScore;
+			}
+
+			$markerLocation = trim((string) ($trackingRow['return_location'] ?? ''));
+			if ($markerLocation === '') {
+				$markerLocation = trim((string) ($trackingRow['pickup_location'] ?? ''));
+			}
+			if ($markerLocation === '' && $hasGpsSignal) {
+				$markerLocation = number_format((float) $gpsLatitude, 5, '.', '') . ', ' . number_format((float) $gpsLongitude, 5, '.', '');
+			}
+			if ($markerLocation === '') {
+				$markerLocation = 'Unavailable';
+			}
+
+			$seedSource = $bookingNumber !== '' ? $bookingNumber : ('marker-' . $bookingId . '-' . $vehicleId);
+			$seed = (int) sprintf('%u', crc32($seedSource));
+
+			if ($hasGpsSignal) {
+				$leftPercent = 10 + fmod((($gpsLongitude + 180) * 0.29), 78);
+				$topPercent = 8 + fmod(((90 - $gpsLatitude) * 0.33), 76);
+			} else {
+				$leftPercent = 10 + ($seed % 78);
+				$topPercent = 8 + (($seed >> 8) % 76);
+			}
+
+			$leftPercent = $clampPercent((float) $leftPercent, 8, 92);
+			$topPercent = $clampPercent((float) $topPercent, 8, 86);
+
+			$payload['markers'][] = [
+				'bookingNumber' => $bookingNumber,
+				'customerName' => $customerName,
+				'customerPhone' => $customerPhone,
+				'location' => $markerLocation,
+				'status' => $bookingStatus,
+				'hasGpsSignal' => $hasGpsSignal,
+				'leftPercent' => round($leftPercent, 2),
+				'topPercent' => round($topPercent, 2),
+			];
+		}
+
+		$payload['kpis']['activeOverdue'] = $overdueCount;
+
+		if (!empty($safetyScores)) {
+			$payload['kpis']['averageSafetyScore'] = (float) round(array_sum($safetyScores) / count($safetyScores), 0);
+		}
+	} catch (Throwable $exception) {
+		error_log('Admin live tracking data failed: ' . $exception->getMessage());
+	}
+
+	return $payload;
+};
+
+$parseDateTimeSafe = static function ($rawDate): ?DateTimeImmutable {
+	$rawDate = trim((string) $rawDate);
+	if ($rawDate === '') {
+		return null;
+	}
+
+	try {
+		return new DateTimeImmutable($rawDate);
+	} catch (Throwable $exception) {
+		return null;
+	}
+};
+
+$resolveEffectiveVehicleStatus = static function (array $vehicleRow, ?DateTimeImmutable $referenceDateTime = null) use ($parseDateTimeSafe): string {
+	$referenceDateTime = $referenceDateTime ?? new DateTimeImmutable('now');
+	$deletedAt = trim((string) ($vehicleRow['deleted_at'] ?? $vehicleRow['vehicle_deleted_at'] ?? ''));
+	if ($deletedAt !== '') {
+		return 'unavailable';
+	}
+
+	$activeBookingStatus = strtolower(trim((string) ($vehicleRow['active_booking_status'] ?? $vehicleRow['vehicle_active_booking_status'] ?? '')));
+	if (in_array($activeBookingStatus, ['reserved', 'on_trip', 'overdue'], true)) {
+		return $activeBookingStatus;
+	}
+
+	$rawStatus = strtolower(trim((string) ($vehicleRow['status'] ?? $vehicleRow['vehicle_current_status'] ?? '')));
+	if ($rawStatus === '') {
+		$rawStatus = 'available';
+	}
+
+	$activePickupDateTime = $parseDateTimeSafe($vehicleRow['active_pickup_datetime'] ?? $vehicleRow['vehicle_active_pickup_datetime'] ?? null);
+	$activeReturnDateTime = $parseDateTimeSafe($vehicleRow['active_return_datetime'] ?? $vehicleRow['vehicle_active_return_datetime'] ?? null);
+	$upcomingPickupDateTime = $parseDateTimeSafe($vehicleRow['upcoming_pickup_datetime'] ?? $vehicleRow['vehicle_upcoming_pickup_datetime'] ?? null);
+
+	if ($activePickupDateTime instanceof DateTimeImmutable && $activeReturnDateTime instanceof DateTimeImmutable) {
+		if ($referenceDateTime > $activeReturnDateTime) {
+			return 'overdue';
+		}
+
+		if ($referenceDateTime >= $activePickupDateTime) {
+			return 'on_trip';
+		}
+
+		$reservedWindowStart = $activePickupDateTime->sub(new DateInterval('P2D'));
+		if ($referenceDateTime >= $reservedWindowStart) {
+			return 'reserved';
+		}
+	}
+
+	if ($upcomingPickupDateTime instanceof DateTimeImmutable) {
+		$reservedWindowStart = $upcomingPickupDateTime->sub(new DateInterval('P2D'));
+		if ($referenceDateTime >= $reservedWindowStart && $referenceDateTime < $upcomingPickupDateTime) {
+			return 'reserved';
+		}
+	}
+
+	if ($rawStatus === 'maintenance') {
+		return 'maintenance';
+	}
+
+	if ($rawStatus === 'unavailable') {
+		return 'unavailable';
+	}
+
+	return 'available';
 };
 
 $page = strtolower(trim((string) ($_GET['page'] ?? 'home')));
@@ -1434,17 +3050,50 @@ if ($page === 'vehicles') {
 
 	try {
 		$statement = db()->prepare(
-			'SELECT v.*, c.name AS category_name
+			'SELECT
+				v.*,
+				c.name AS category_name,
+				active_booking.status AS active_booking_status,
+				active_booking.pickup_datetime AS active_pickup_datetime,
+				active_booking.return_datetime AS active_return_datetime,
+				upcoming_booking.pickup_datetime AS upcoming_pickup_datetime
 			FROM vehicles v
 			INNER JOIN categories c ON c.id = v.category_id
-			WHERE v.vehicle_type = :vehicle_type AND v.status = :status
+			LEFT JOIN bookings active_booking ON active_booking.id = (
+				SELECT b1.id
+				FROM bookings b1
+				WHERE b1.vehicle_id = v.id
+					AND b1.status IN ("reserved", "on_trip", "overdue")
+				ORDER BY COALESCE(b1.updated_at, b1.created_at) DESC, b1.id DESC
+				LIMIT 1
+			)
+			LEFT JOIN bookings upcoming_booking ON upcoming_booking.id = (
+				SELECT b2.id
+				FROM bookings b2
+				WHERE b2.vehicle_id = v.id
+					AND b2.status = "reserved"
+					AND b2.pickup_datetime >= CURRENT_TIMESTAMP
+				ORDER BY b2.pickup_datetime ASC, b2.id ASC
+				LIMIT 1
+			)
+			WHERE v.vehicle_type = :vehicle_type AND v.deleted_at IS NULL
 			ORDER BY v.created_at DESC'
 		);
 		$statement->execute([
 			'vehicle_type' => $selectedVehicleType,
-			'status' => 'available',
 		]);
-		$vehicles = $statement->fetchAll() ?: [];
+
+		$vehiclesRaw = $statement->fetchAll() ?: [];
+		$nowDateTime = new DateTimeImmutable('now');
+		foreach ($vehiclesRaw as $vehicleRow) {
+			$effectiveStatus = $resolveEffectiveVehicleStatus($vehicleRow, $nowDateTime);
+			if ($effectiveStatus !== 'available') {
+				continue;
+			}
+
+			$vehicleRow['status'] = $effectiveStatus;
+			$vehicles[] = $vehicleRow;
+		}
 	} catch (Throwable $exception) {
 		error_log('Vehicle listing query failed: ' . $exception->getMessage());
 		$vehicles = [];
@@ -1477,16 +3126,46 @@ if ($page === 'vehicles') {
 	if ($vehicleId > 0) {
 		try {
 			$statement = db()->prepare(
-				'SELECT v.*, c.name AS category_name
+				'SELECT
+					v.*,
+					c.name AS category_name,
+					active_booking.status AS active_booking_status,
+					active_booking.pickup_datetime AS active_pickup_datetime,
+					active_booking.return_datetime AS active_return_datetime,
+					upcoming_booking.pickup_datetime AS upcoming_pickup_datetime
 				FROM vehicles v
 				INNER JOIN categories c ON c.id = v.category_id
-				WHERE v.id = :id
+				LEFT JOIN bookings active_booking ON active_booking.id = (
+					SELECT b1.id
+					FROM bookings b1
+					WHERE b1.vehicle_id = v.id
+						AND b1.status IN ("reserved", "on_trip", "overdue")
+					ORDER BY COALESCE(b1.updated_at, b1.created_at) DESC, b1.id DESC
+					LIMIT 1
+				)
+				LEFT JOIN bookings upcoming_booking ON upcoming_booking.id = (
+					SELECT b2.id
+					FROM bookings b2
+					WHERE b2.vehicle_id = v.id
+						AND b2.status = "reserved"
+						AND b2.pickup_datetime >= CURRENT_TIMESTAMP
+					ORDER BY b2.pickup_datetime ASC, b2.id ASC
+					LIMIT 1
+				)
+				WHERE v.id = :id AND v.deleted_at IS NULL
 				LIMIT 1'
 			);
 			$statement->execute([
 				'id' => $vehicleId,
 			]);
 			$vehicle = $statement->fetch() ?: null;
+
+			if (is_array($vehicle)) {
+				$effectiveStatus = $resolveEffectiveVehicleStatus($vehicle, new DateTimeImmutable('now'));
+				if ($effectiveStatus !== 'available') {
+					$vehicle = null;
+				}
+			}
 		} catch (Throwable $exception) {
 			error_log('Vehicle detail query failed: ' . $exception->getMessage());
 			$vehicle = null;
@@ -1617,6 +3296,8 @@ if ($page === 'vehicles') {
 				v.gps_id,
 				v.last_service_date,
 				v.description,
+				latest_booking.status AS active_booking_status,
+				latest_booking.id AS active_booking_id,
 				latest_booking.booking_number AS active_booking_number,
 				latest_booking.pickup_datetime AS active_pickup_datetime,
 				latest_booking.return_datetime AS active_return_datetime,
@@ -1680,27 +3361,40 @@ if ($page === 'vehicles') {
 		";
 
 		if ($fleetMode === 'status') {
-			$fleetStmt = $pdo->prepare(
+			$fleetStmt = $pdo->query(
 				$fleetBaseSelectSql . '
-				WHERE v.status = :status
+				WHERE v.deleted_at IS NULL
 				ORDER BY v.id DESC'
 			);
-			$fleetStmt->execute([
-				'status' => $selectedFleetStatus,
-			]);
 		} else {
 			$fleetStmt = $pdo->prepare(
 				$fleetBaseSelectSql . '
-				WHERE v.vehicle_type = :vehicle_type AND v.status = :status
+				WHERE v.vehicle_type = :vehicle_type AND v.deleted_at IS NULL
 				ORDER BY v.id DESC'
 			);
 			$fleetStmt->execute([
 				'vehicle_type' => $selectedFleetType,
-				'status' => 'available',
 			]);
 		}
 
-		$fleetVehicles = $fleetStmt->fetchAll() ?: [];
+		$fleetVehiclesRaw = $fleetStmt->fetchAll() ?: [];
+		$nowDateTime = new DateTimeImmutable('now');
+		$fleetVehicles = [];
+
+		foreach ($fleetVehiclesRaw as $fleetVehicle) {
+			$effectiveStatus = $resolveEffectiveVehicleStatus($fleetVehicle, $nowDateTime);
+			$fleetVehicle['status'] = $effectiveStatus;
+
+			if ($fleetMode === 'status' && $effectiveStatus !== $selectedFleetStatus) {
+				continue;
+			}
+
+			if ($fleetMode !== 'status' && $effectiveStatus !== 'available') {
+				continue;
+			}
+
+			$fleetVehicles[] = $fleetVehicle;
+		}
 	} catch (Throwable $exception) {
 		error_log('Admin manage fleet data failed: ' . $exception->getMessage());
 		$fleetVehicles = [];
@@ -1716,6 +3410,215 @@ if ($page === 'vehicles') {
 		'openReadVehicleId' => $openReadVehicleId,
 		'fleetVehicles' => $fleetVehicles,
 	];
+} elseif ($page === 'admin-all-bookings') {
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');
+
+	if (!$isAdminSession) {
+		header('Location: index.php', true, 302);
+		exit;
+	}
+
+	$openBookingId = (int) ($_GET['open_booking_id'] ?? 0);
+
+	$adminBookings = [];
+	try {
+		$bookingStmt = db()->query(
+			'SELECT
+				b.id,
+				b.booking_number,
+				b.vehicle_id,
+				CASE
+					WHEN b.status IN ("completed", "cancelled") THEN b.status
+					WHEN b.return_time IS NOT NULL THEN "completed"
+					WHEN CURRENT_TIMESTAMP > b.return_datetime THEN "overdue"
+					WHEN CURRENT_TIMESTAMP >= b.pickup_datetime THEN "on_trip"
+					ELSE "reserved"
+				END AS booking_status,
+				b.pickup_location,
+				b.return_location,
+				b.pickup_datetime,
+				b.return_datetime,
+				b.return_time,
+				b.payment_status,
+				b.payment_method,
+				b.total_amount,
+				b.paid_amount,
+				b.late_fee,
+				b.drivers_id,
+				u.name AS customer_name,
+				u.phone AS customer_phone,
+				u.email AS customer_email,
+				v.short_name AS vehicle_short_name,
+				v.full_name AS vehicle_full_name,
+				v.vehicle_type,
+				v.gps_id AS vehicle_gps_id,
+				v.image_path AS vehicle_image,
+				v.price_per_day,
+				v.status AS vehicle_current_status,
+				v.deleted_at AS vehicle_deleted_at,
+				CASE WHEN v.id IS NULL OR v.deleted_at IS NOT NULL THEN 1 ELSE 0 END AS vehicle_is_unavailable,
+				latest_vehicle_gps.latitude AS gps_latitude,
+				latest_vehicle_gps.longitude AS gps_longitude,
+				latest_vehicle_gps.safety_score AS gps_safety_score,
+				latest_vehicle_gps.timestamp AS gps_timestamp,
+				active_vehicle_booking.status AS vehicle_active_booking_status,
+				active_vehicle_booking.pickup_datetime AS vehicle_active_pickup_datetime,
+				active_vehicle_booking.return_datetime AS vehicle_active_return_datetime,
+				upcoming_vehicle_booking.pickup_datetime AS vehicle_upcoming_pickup_datetime
+			 FROM (
+				SELECT
+					source_booking.*,
+					CASE
+						WHEN source_booking.return_time IS NULL
+							AND source_booking.status NOT IN ("completed", "cancelled")
+							AND CURRENT_TIMESTAMP >= source_booking.pickup_datetime
+							AND source_booking.user_id IS NOT NULL
+							AND source_booking.user_id > 0
+							AND EXISTS (
+								SELECT 1
+								FROM bookings prior_active
+								WHERE prior_active.user_id = source_booking.user_id
+									AND prior_active.return_time IS NULL
+									AND prior_active.status NOT IN ("completed", "cancelled")
+									AND CURRENT_TIMESTAMP >= prior_active.pickup_datetime
+									AND (
+										prior_active.pickup_datetime < source_booking.pickup_datetime
+										OR (
+											prior_active.pickup_datetime = source_booking.pickup_datetime
+											AND prior_active.id < source_booking.id
+										)
+									)
+							)
+						THEN COALESCE(
+							(
+								SELECT replacement_user.id
+								FROM users replacement_user
+								WHERE replacement_user.id <> source_booking.user_id
+									AND replacement_user.role = "user"
+									AND replacement_user.id NOT IN (
+										SELECT DISTINCT active_user_booking.user_id
+										FROM bookings active_user_booking
+										WHERE active_user_booking.return_time IS NULL
+											AND active_user_booking.status NOT IN ("completed", "cancelled")
+											AND CURRENT_TIMESTAMP >= active_user_booking.pickup_datetime
+											AND active_user_booking.user_id IS NOT NULL
+											AND active_user_booking.user_id > 0
+									)
+								ORDER BY replacement_user.id DESC
+								LIMIT 1
+							),
+							(
+								SELECT fallback_user.id
+								FROM users fallback_user
+								WHERE fallback_user.role = "user"
+								ORDER BY fallback_user.id DESC
+								LIMIT 1
+							),
+							source_booking.user_id
+						)
+						ELSE source_booking.user_id
+					END AS effective_user_id
+				FROM bookings source_booking
+			 ) b
+			 LEFT JOIN vehicles v ON v.id = b.vehicle_id
+			 LEFT JOIN users u ON u.id = b.effective_user_id
+			 LEFT JOIN gps_logs latest_vehicle_gps ON latest_vehicle_gps.id = (
+				SELECT g1.id
+				FROM gps_logs g1
+				WHERE g1.vehicle_id = b.vehicle_id
+				ORDER BY COALESCE(g1.timestamp, g1.created_at) DESC, g1.id DESC
+				LIMIT 1
+			 )
+			 LEFT JOIN bookings active_vehicle_booking ON active_vehicle_booking.id = (
+				SELECT b2.id
+				FROM bookings b2
+				WHERE b2.vehicle_id = b.vehicle_id
+					AND b2.status IN (\'reserved\', \'on_trip\', \'overdue\')
+				ORDER BY COALESCE(b2.updated_at, b2.created_at) DESC, b2.id DESC
+				LIMIT 1
+			 )
+			 LEFT JOIN bookings upcoming_vehicle_booking ON upcoming_vehicle_booking.id = (
+				SELECT b3.id
+				FROM bookings b3
+				WHERE b3.vehicle_id = b.vehicle_id
+					AND b3.status IN (\'reserved\')
+					AND b3.pickup_datetime >= CURRENT_TIMESTAMP
+				ORDER BY b3.pickup_datetime ASC, b3.id ASC
+				LIMIT 1
+			 )
+			 ORDER BY b.pickup_datetime DESC, b.return_datetime DESC, b.id DESC'
+		);
+		$adminBookings = $bookingStmt->fetchAll() ?: [];
+
+		$nowDateTime = new DateTimeImmutable('now');
+		foreach ($adminBookings as &$adminBooking) {
+			$adminBooking['vehicle_current_status'] = $resolveEffectiveVehicleStatus($adminBooking, $nowDateTime);
+		}
+		unset($adminBooking);
+	} catch (Throwable $exception) {
+		error_log('Admin all bookings query failed: ' . $exception->getMessage());
+		$adminBookings = [];
+	}
+
+	$title = 'Ridex | All Bookings';
+	$view = 'admin/bookings/list';
+	$viewData = [
+		'adminUserName' => (string) ($sessionUser['name'] ?? 'Admin'),
+		'openBookingId' => $openBookingId,
+		'adminBookings' => $adminBookings,
+	];
+} elseif ($page === 'admin-live-tracking') {
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');
+
+	if (!$isAdminSession) {
+		header('Location: index.php', true, 302);
+		exit;
+	}
+
+	$liveTrackingPayload = $getAdminLiveTrackingPayload();
+
+	$title = 'Ridex | Live Tracking';
+	$view = 'admin/gps/live';
+	$viewData = [
+		'adminUserName' => (string) ($sessionUser['name'] ?? 'Admin'),
+		'liveTrackingKpis' => is_array($liveTrackingPayload['kpis'] ?? null) ? $liveTrackingPayload['kpis'] : [],
+		'liveTrackingMarkers' => is_array($liveTrackingPayload['markers'] ?? null) ? $liveTrackingPayload['markers'] : [],
+		'liveTrackingGeneratedAt' => trim((string) ($liveTrackingPayload['generatedAt'] ?? '')),
+	];
+} elseif ($page === 'admin-dashboard-data') {
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');
+
+	header('Content-Type: application/json; charset=UTF-8');
+	header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+	header('Pragma: no-cache');
+	header('X-Content-Type-Options: nosniff');
+
+	if (!$isAdminSession) {
+		http_response_code(401);
+		echo '{"ok":false,"message":"Unauthorized"}';
+		exit;
+	}
+
+	$dashboardPayload = $getAdminDashboardPayload();
+	$responseJson = json_encode(
+		[
+			'ok' => true,
+			'payload' => $dashboardPayload,
+		],
+		JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
+	);
+
+	if (!is_string($responseJson)) {
+		http_response_code(500);
+		echo '{"ok":false,"message":"Unable to encode dashboard data."}';
+		exit;
+	}
+
+	echo $responseJson;
+	exit;
 } elseif ($page === 'admin-dashboard') {
 	$sessionUser = $_SESSION['auth_user'] ?? [];
 	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');
@@ -1725,248 +3628,9 @@ if ($page === 'vehicles') {
 		exit;
 	}
 
-	$calculatePercentChange = static function (?float $current, ?float $previous): ?float {
-		if ($current === null || $previous === null) {
-			return null;
-		}
-
-		if (abs($previous) < 0.00001) {
-			return $current > 0 ? 100.0 : null;
-		}
-
-		return (($current - $previous) / abs($previous)) * 100;
-	};
-
-	$dashboardKpis = [
-		'totalRevenue' => [
-			'value' => null,
-			'trend' => null,
-		],
-		'activeRentals' => [
-			'value' => null,
-			'trend' => null,
-		],
-		'totalFleet' => [
-			'value' => null,
-			'trend' => null,
-		],
-		'fleetAvailability' => [
-			'value' => null,
-			'trend' => null,
-		],
-	];
-
-	$dashboardCharts = [
-		'salesVehicleCategory' => [
-			'labels' => [],
-			'datasets' => [
-				[
-					'label' => 'Cars',
-					'data' => [],
-					'borderColor' => '#f75b7a',
-				],
-				[
-					'label' => 'Bikes',
-					'data' => [],
-					'borderColor' => '#45aaf2',
-				],
-				[
-					'label' => 'Luxury',
-					'data' => [],
-					'borderColor' => '#2db9b0',
-				],
-			],
-		],
-		'mostRentedVehicleCategory' => [
-			'labels' => ['Cars', 'Bikes', 'Luxury'],
-			'datasets' => [
-				[
-					'label' => 'Most Rented',
-					'data' => [0, 0, 0],
-					'backgroundColor' => ['#f75b7a', '#f6a340', '#f4ca55'],
-				],
-			],
-		],
-	];
-
-	try {
-		$pdo = db();
-
-		$fleetStatsStmt = $pdo->query(
-			'SELECT
-				COUNT(*) AS total_fleet,
-				SUM(CASE WHEN status = "available" THEN 1 ELSE 0 END) AS available_fleet
-			 FROM vehicles'
-		);
-		$fleetStats = $fleetStatsStmt->fetch() ?: [];
-		$totalFleet = (int) ($fleetStats['total_fleet'] ?? 0);
-		$availableFleet = (int) ($fleetStats['available_fleet'] ?? 0);
-
-		if ($totalFleet > 0) {
-			$dashboardKpis['totalFleet']['value'] = $totalFleet;
-			$dashboardKpis['fleetAvailability']['value'] = round(($availableFleet / $totalFleet) * 100, 1);
-		}
-
-		$bookingStatsStmt = $pdo->query(
-			'SELECT
-				COUNT(*) AS total_bookings,
-				SUM(CASE WHEN status IN ("reserved", "on_trip", "overdue") THEN 1 ELSE 0 END) AS active_rentals,
-				SUM(CASE WHEN payment_status = "paid" THEN paid_amount ELSE 0 END) AS paid_revenue
-			 FROM bookings'
-		);
-		$bookingStats = $bookingStatsStmt->fetch() ?: [];
-		$totalBookings = (int) ($bookingStats['total_bookings'] ?? 0);
-
-		if ($totalBookings > 0) {
-			$dashboardKpis['activeRentals']['value'] = (int) ($bookingStats['active_rentals'] ?? 0);
-			$dashboardKpis['totalRevenue']['value'] = (float) ($bookingStats['paid_revenue'] ?? 0);
-		}
-
-		$today = new DateTimeImmutable('today');
-		$currentStart = $today->sub(new DateInterval('P30D'));
-		$previousStart = $today->sub(new DateInterval('P60D'));
-
-		$periodParams = [
-			'current_start' => $currentStart->format('Y-m-d H:i:s'),
-			'current_end' => $today->format('Y-m-d H:i:s'),
-			'previous_start' => $previousStart->format('Y-m-d H:i:s'),
-			'previous_end' => $currentStart->format('Y-m-d H:i:s'),
-		];
-
-		$revenueTrendStmt = $pdo->prepare(
-			'SELECT
-				SUM(CASE WHEN created_at >= :current_start AND created_at < :current_end AND payment_status = "paid" THEN paid_amount ELSE 0 END) AS current_revenue,
-				SUM(CASE WHEN created_at >= :previous_start AND created_at < :previous_end AND payment_status = "paid" THEN paid_amount ELSE 0 END) AS previous_revenue
-			 FROM bookings'
-		);
-		$revenueTrendStmt->execute($periodParams);
-		$revenueTrend = $revenueTrendStmt->fetch() ?: [];
-		$dashboardKpis['totalRevenue']['trend'] = $calculatePercentChange(
-			(float) ($revenueTrend['current_revenue'] ?? 0),
-			(float) ($revenueTrend['previous_revenue'] ?? 0)
-		);
-
-		$activeTrendStmt = $pdo->prepare(
-			'SELECT
-				SUM(CASE WHEN created_at >= :current_start AND created_at < :current_end AND status IN ("reserved", "on_trip", "overdue") THEN 1 ELSE 0 END) AS current_active,
-				SUM(CASE WHEN created_at >= :previous_start AND created_at < :previous_end AND status IN ("reserved", "on_trip", "overdue") THEN 1 ELSE 0 END) AS previous_active
-			 FROM bookings'
-		);
-		$activeTrendStmt->execute($periodParams);
-		$activeTrend = $activeTrendStmt->fetch() ?: [];
-		$dashboardKpis['activeRentals']['trend'] = $calculatePercentChange(
-			(float) ($activeTrend['current_active'] ?? 0),
-			(float) ($activeTrend['previous_active'] ?? 0)
-		);
-
-		$fleetTrendStmt = $pdo->prepare(
-			'SELECT
-				SUM(CASE WHEN created_at >= :current_start AND created_at < :current_end THEN 1 ELSE 0 END) AS current_fleet,
-				SUM(CASE WHEN created_at >= :previous_start AND created_at < :previous_end THEN 1 ELSE 0 END) AS previous_fleet,
-				SUM(CASE WHEN created_at >= :current_start AND created_at < :current_end AND status = "available" THEN 1 ELSE 0 END) AS current_available,
-				SUM(CASE WHEN created_at >= :previous_start AND created_at < :previous_end AND status = "available" THEN 1 ELSE 0 END) AS previous_available
-			 FROM vehicles'
-		);
-		$fleetTrendStmt->execute($periodParams);
-		$fleetTrend = $fleetTrendStmt->fetch() ?: [];
-
-		$dashboardKpis['totalFleet']['trend'] = $calculatePercentChange(
-			(float) ($fleetTrend['current_fleet'] ?? 0),
-			(float) ($fleetTrend['previous_fleet'] ?? 0)
-		);
-
-		$currentFleetWindow = (float) ($fleetTrend['current_fleet'] ?? 0);
-		$previousFleetWindow = (float) ($fleetTrend['previous_fleet'] ?? 0);
-		$currentAvailabilityRatio = $currentFleetWindow > 0 ? ((float) ($fleetTrend['current_available'] ?? 0) / $currentFleetWindow) * 100 : null;
-		$previousAvailabilityRatio = $previousFleetWindow > 0 ? ((float) ($fleetTrend['previous_available'] ?? 0) / $previousFleetWindow) * 100 : null;
-		$dashboardKpis['fleetAvailability']['trend'] = $calculatePercentChange($currentAvailabilityRatio, $previousAvailabilityRatio);
-
-		$lineDays = 15;
-		$lineDateKeys = [];
-		$lineLabels = [];
-		$lineIndexByDate = [];
-
-		for ($index = $lineDays - 1; $index >= 0; $index--) {
-			$date = (new DateTimeImmutable('today'))->sub(new DateInterval('P' . $index . 'D'));
-			$dateKey = $date->format('Y-m-d');
-			$lineDateKeys[] = $dateKey;
-			$lineLabels[] = $date->format('M j');
-		}
-
-		$lineIndexByDate = array_flip($lineDateKeys);
-		$lineCars = array_fill(0, $lineDays, 0);
-		$lineBikes = array_fill(0, $lineDays, 0);
-		$lineLuxury = array_fill(0, $lineDays, 0);
-
-		$lineChartStmt = $pdo->prepare(
-			'SELECT
-				DATE(b.pickup_datetime) AS booking_date,
-				v.vehicle_type,
-				COUNT(*) AS total
-			 FROM bookings b
-			 INNER JOIN vehicles v ON v.id = b.vehicle_id
-			 WHERE b.pickup_datetime >= :line_start
-			 GROUP BY DATE(b.pickup_datetime), v.vehicle_type
-			 ORDER BY booking_date ASC'
-		);
-		$lineChartStmt->execute([
-			'line_start' => $lineDateKeys[0] . ' 00:00:00',
-		]);
-
-		while ($lineRow = $lineChartStmt->fetch()) {
-			$dateKey = (string) ($lineRow['booking_date'] ?? '');
-			$vehicleType = strtolower(trim((string) ($lineRow['vehicle_type'] ?? '')));
-			$total = (int) ($lineRow['total'] ?? 0);
-
-			if (!array_key_exists($dateKey, $lineIndexByDate)) {
-				continue;
-			}
-
-			$targetIndex = (int) $lineIndexByDate[$dateKey];
-			if ($vehicleType === 'cars') {
-				$lineCars[$targetIndex] = $total;
-			} elseif ($vehicleType === 'bikes') {
-				$lineBikes[$targetIndex] = $total;
-			} elseif ($vehicleType === 'luxury') {
-				$lineLuxury[$targetIndex] = $total;
-			}
-		}
-
-		$dashboardCharts['salesVehicleCategory']['labels'] = $lineLabels;
-		$dashboardCharts['salesVehicleCategory']['datasets'][0]['data'] = $lineCars;
-		$dashboardCharts['salesVehicleCategory']['datasets'][1]['data'] = $lineBikes;
-		$dashboardCharts['salesVehicleCategory']['datasets'][2]['data'] = $lineLuxury;
-
-		$pieChartStmt = $pdo->query(
-			'SELECT
-				v.vehicle_type,
-				COUNT(*) AS total
-			 FROM bookings b
-			 INNER JOIN vehicles v ON v.id = b.vehicle_id
-			 GROUP BY v.vehicle_type'
-		);
-
-		$pieCounts = [
-			'cars' => 0,
-			'bikes' => 0,
-			'luxury' => 0,
-		];
-
-		while ($pieRow = $pieChartStmt->fetch()) {
-			$type = strtolower(trim((string) ($pieRow['vehicle_type'] ?? '')));
-			if (array_key_exists($type, $pieCounts)) {
-				$pieCounts[$type] = (int) ($pieRow['total'] ?? 0);
-			}
-		}
-
-		$dashboardCharts['mostRentedVehicleCategory']['datasets'][0]['data'] = [
-			$pieCounts['cars'],
-			$pieCounts['bikes'],
-			$pieCounts['luxury'],
-		];
-	} catch (Throwable $exception) {
-		error_log('Admin dashboard data failed: ' . $exception->getMessage());
-	}
+	$dashboardPayload = $getAdminDashboardPayload();
+	$dashboardKpis = is_array($dashboardPayload['kpis'] ?? null) ? $dashboardPayload['kpis'] : [];
+	$dashboardCharts = is_array($dashboardPayload['charts'] ?? null) ? $dashboardPayload['charts'] : [];
 
 	$title = 'Ridex | Admin Dashboard';
 	$view = 'admin/dashboard';
@@ -1974,6 +3638,8 @@ if ($page === 'vehicles') {
 		'adminUserName' => (string) ($sessionUser['name'] ?? 'Admin'),
 		'dashboardKpis' => $dashboardKpis,
 		'dashboardCharts' => $dashboardCharts,
+		'dashboardDataEndpoint' => 'index.php?page=admin-dashboard-data',
+		'dashboardRefreshIntervalMs' => 30000,
 	];
 } else {
 	$selectedHomeVehicleType = $sanitizeVehicleType($_GET['featured_type'] ?? 'cars');
@@ -1981,18 +3647,54 @@ if ($page === 'vehicles') {
 
 	try {
 		$statement = db()->prepare(
-			'SELECT v.*, c.name AS category_name
+			'SELECT
+				v.*,
+				c.name AS category_name,
+				active_booking.status AS active_booking_status,
+				active_booking.pickup_datetime AS active_pickup_datetime,
+				active_booking.return_datetime AS active_return_datetime,
+				upcoming_booking.pickup_datetime AS upcoming_pickup_datetime
 			FROM vehicles v
 			INNER JOIN categories c ON c.id = v.category_id
-			WHERE v.vehicle_type = :vehicle_type AND v.status = :status
+			LEFT JOIN bookings active_booking ON active_booking.id = (
+				SELECT b1.id
+				FROM bookings b1
+				WHERE b1.vehicle_id = v.id
+					AND b1.status IN ("reserved", "on_trip", "overdue")
+				ORDER BY COALESCE(b1.updated_at, b1.created_at) DESC, b1.id DESC
+				LIMIT 1
+			)
+			LEFT JOIN bookings upcoming_booking ON upcoming_booking.id = (
+				SELECT b2.id
+				FROM bookings b2
+				WHERE b2.vehicle_id = v.id
+					AND b2.status = "reserved"
+					AND b2.pickup_datetime >= CURRENT_TIMESTAMP
+				ORDER BY b2.pickup_datetime ASC, b2.id ASC
+				LIMIT 1
+			)
+			WHERE v.vehicle_type = :vehicle_type AND v.deleted_at IS NULL
 			ORDER BY v.created_at DESC
-			LIMIT 3'
+			LIMIT 24'
 		);
 		$statement->execute([
 			'vehicle_type' => $selectedHomeVehicleType,
-			'status' => 'available',
 		]);
-		$featuredVehicles = $statement->fetchAll() ?: [];
+
+		$featuredVehiclesRaw = $statement->fetchAll() ?: [];
+		$nowDateTime = new DateTimeImmutable('now');
+		foreach ($featuredVehiclesRaw as $vehicleRow) {
+			$effectiveStatus = $resolveEffectiveVehicleStatus($vehicleRow, $nowDateTime);
+			if ($effectiveStatus !== 'available') {
+				continue;
+			}
+
+			$vehicleRow['status'] = $effectiveStatus;
+			$featuredVehicles[] = $vehicleRow;
+			if (count($featuredVehicles) >= 3) {
+				break;
+			}
+		}
 	} catch (Throwable $exception) {
 		error_log('Featured vehicle query failed: ' . $exception->getMessage());
 		$featuredVehicles = [];

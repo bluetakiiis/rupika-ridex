@@ -72,6 +72,7 @@ CREATE TABLE vehicles (
 	gps_id                VARCHAR(50),
 	last_service_date     DATE,
 	description           TEXT,
+	deleted_at            TIMESTAMP NULL DEFAULT NULL,
 	created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT fk_vehicles_category FOREIGN KEY (category_id) REFERENCES categories(id)

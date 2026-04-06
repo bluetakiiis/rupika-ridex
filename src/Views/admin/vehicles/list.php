@@ -76,8 +76,8 @@ if ($fleetMode === 'status') {
 			<nav class="admin-sidebar__nav" aria-label="Admin sections">
 				<a class="admin-sidebar__link" href="index.php?page=admin-dashboard">Dashboard</a>
 				<a class="admin-sidebar__link is-active" href="index.php?page=admin-manage-fleet" aria-current="page">Manage Fleet</a>
-				<span class="admin-sidebar__link is-disabled" aria-disabled="true">All Bookings</span>
-				<span class="admin-sidebar__link is-disabled" aria-disabled="true">Live Tracking</span>
+				<a class="admin-sidebar__link" href="index.php?page=admin-all-bookings">All Bookings</a>
+				<a class="admin-sidebar__link" href="index.php?page=admin-live-tracking">Live Tracking</a>
 			</nav>
 		</aside>
 
@@ -144,7 +144,11 @@ if ($fleetMode === 'status') {
 					$vehicleGpsId = $resolveVehicleValue($vehicle, 'gps_id');
 					$vehicleLastService = $resolveVehicleValue($vehicle, 'last_service_date');
 					$vehicleDescription = $resolveVehicleValue($vehicle, 'description');
+					$activeBookingId = (int) ($vehicle['active_booking_id'] ?? 0);
 					$activeBookingNumber = $resolveVehicleValue($vehicle, 'active_booking_number');
+					if ($activeBookingNumber === '' && $activeBookingId > 0) {
+						$activeBookingNumber = '#BK-' . str_pad((string) $activeBookingId, 4, '0', STR_PAD_LEFT);
+					}
 					$activeBookingUserName = $resolveVehicleValue($vehicle, 'active_booking_user_name');
 					$activeBookingUserPhone = $resolveVehicleValue($vehicle, 'active_booking_user_phone');
 					$activePickupDatetime = $resolveVehicleValue($vehicle, 'active_pickup_datetime');
@@ -187,6 +191,7 @@ if ($fleetMode === 'status') {
 								data-read-vehicle-last-service="<?= htmlspecialchars($vehicleLastService, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-vehicle-description="<?= htmlspecialchars($vehicleDescription, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-booking-number="<?= htmlspecialchars($activeBookingNumber, ENT_QUOTES, 'UTF-8') ?>"
+								data-read-booking-id="<?= htmlspecialchars((string) max(0, $activeBookingId), ENT_QUOTES, 'UTF-8') ?>"
 								data-read-booking-user-name="<?= htmlspecialchars($activeBookingUserName, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-booking-user-phone="<?= htmlspecialchars($activeBookingUserPhone, ENT_QUOTES, 'UTF-8') ?>"
 								data-read-booking-pickup="<?= htmlspecialchars($activePickupDatetime, ENT_QUOTES, 'UTF-8') ?>"

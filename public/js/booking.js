@@ -41,6 +41,11 @@
   const bindPickerTriggers = () => {
     document.querySelectorAll("[data-open-picker-for]").forEach((trigger) => {
       const targetId = trigger.getAttribute("data-open-picker-for");
+
+      if (targetId === "admin-booking-return-time-input") {
+        return;
+      }
+
       const input = targetId ? getInputById(targetId) : null;
 
       if (!input) {
@@ -215,6 +220,7 @@
       allowInput: true,
       disableMobile: true,
       static: true,
+      monthSelectorType: "static",
     };
 
     const dateOptions = {

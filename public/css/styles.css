@@ -256,24 +256,6 @@ body.menu-modal-open {
   margin-right: auto;
 }
 
-@media (max-width: 860px) {
-  .menu-modal__dialog {
-    top: 10px;
-    bottom: 10px;
-    width: calc(100% - 10px);
-    border-radius: 24px 0 0 24px;
-    padding: 18px 18px 22px;
-  }
-
-  .menu-modal__nav {
-    width: min(250px, 100%);
-  }
-
-  .menu-modal__link {
-    font-size: clamp(17px, 5.8vw, 26px);
-  }
-}
-
 .material-symbols-rounded {
   font-variation-settings:
     "FILL" 0,
@@ -719,6 +701,34 @@ body.menu-modal-open {
 .flatpickr-current-month input.cur-year {
   color: #101010;
   font-weight: 700;
+  border: 1px solid #cfecc9;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 2px 8px;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months option {
+  background: #ffffff;
+  color: #101010;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months option:checked {
+  background: var(--color-main-secondary);
+  color: #ffffff;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months:focus,
+.flatpickr-current-month .flatpickr-monthDropdown-months:focus-visible,
+.flatpickr-current-month input.cur-year:focus,
+.flatpickr-current-month input.cur-year:focus-visible {
+  outline: none;
+  border-color: var(--color-main-secondary);
+  box-shadow: 0 0 0 2px rgba(71, 228, 55, 0.2);
 }
 
 .flatpickr-weekdays {
@@ -779,6 +789,14 @@ span.flatpickr-weekday {
 .flatpickr-time .flatpickr-am-pm:hover,
 .flatpickr-time input:hover {
   background: rgba(71, 228, 55, 0.16);
+}
+
+.flatpickr-time .flatpickr-am-pm:focus,
+.flatpickr-time .flatpickr-am-pm:focus-visible,
+.flatpickr-time input:focus,
+.flatpickr-time input:focus-visible {
+  background: rgba(71, 228, 55, 0.16);
+  outline: none;
 }
 
 .flatpickr-time .numInputWrapper span.arrowUp:after {
