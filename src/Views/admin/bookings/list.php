@@ -435,7 +435,7 @@ $formatTotal = static function ($amount): string {
 									$canDeleteBooking = $isReturnedBooking
 										|| ($bookingStatusRaw === 'cancelled' && in_array($paymentStatusRaw, ['refunded', 'unpaid'], true));
 									$canApproveCancellation = $bookingStatusRaw === 'cancelled'
-										&& in_array($paymentStatusRaw, ['cancelled', 'pending', 'paid', 'unpaid'], true);
+										&& in_array($paymentStatusRaw, ['cancelled', 'pending', 'paid'], true);
 									$vehicleId = (int) ($booking['vehicle_id'] ?? 0);
 									$vehicleGpsId = trim((string) ($booking['vehicle_gps_id'] ?? ''));
 									$pickupLocation = trim((string) ($booking['pickup_location'] ?? ''));

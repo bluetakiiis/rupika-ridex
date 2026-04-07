@@ -1,8 +1,7 @@
 /**
  * Purpose: Admin dashboard JS to load metrics and render charts/widgets.
  * Website Section: Admin Dashboard.
- * Developer Notes: Fetch metrics via AJAX, hydrate Chart.js configs, update KPI cards, and handle auto-refresh/filters.
- */
+*/
 
 (function () {
   "use strict";
@@ -37,34 +36,6 @@
 
     var numericValue = Number(value);
     return Number.isFinite(numericValue);
-  };
-
-  var toNumericArray = function (values) {
-    if (!Array.isArray(values)) {
-      return [];
-    }
-
-    var numericValues = [];
-    for (var index = 0; index < values.length; index += 1) {
-      var numericValue = Number(values[index]);
-      numericValues.push(Number.isFinite(numericValue) ? numericValue : 0);
-    }
-
-    return numericValues;
-  };
-
-  var hasNonZeroValues = function (values) {
-    if (!Array.isArray(values)) {
-      return false;
-    }
-
-    for (var index = 0; index < values.length; index += 1) {
-      if (Number(values[index]) > 0) {
-        return true;
-      }
-    }
-
-    return false;
   };
 
   var normalizePayload = function (payload) {
@@ -241,55 +212,19 @@
     }
   };
 
-  var normalizeSalesData = function (charts) {
-    var sales =
-      charts && typeof charts === "object"
-        ? charts.salesVehicleCategory || {}
-        : {};
-    var labels = Array.isArray(sales.labels) ? sales.labels.map(String) : [];
-    var datasetSource = Array.isArray(sales.datasets) ? sales.datasets : [];
-    var defaultColors = ["#f75b7a", "#45aaf2", "#2db9b0"];
-    var datasets = [];
-
-    for (var index = 0; index < datasetSource.length; index += 1) {
-      var source = datasetSource[index] || {};
-      var numericValues = toNumericArray(source.data);
-      if (numericValues.length < labels.length) {
-        for (var pad = numericValues.length; pad < labels.length; pad += 1) {
-          numericValues.push(0);
-        }
-      } else if (numericValues.length > labels.length) {
-        numericValues = numericValues.slice(0, labels.length);
-      }
-
-      datasets.push({
-        label: typeof source.label === "string" ? source.label : "",
-        data: numericValues,
-        borderColor:
-          source.borderColor || defaultColors[index % defaultColors.length],
-        backgroundColor:
-          source.borderColor || defaultColors[index % defaultColors.length],
-        pointRadius: 3,
-        pointHoverRadius: 4,
-        tension: 0,
-        fill: false,
-        borderWidth: 2,
-      });
+  var getChartsApi = function () {
+    if (!window.RidexCharts || typeof window.RidexCharts !== "object") {
+      return null;
     }
 
-    return {
-      labels: labels,
-      datasets: datasets,
-    };
+    return window.RidexCharts;
   };
 
   var renderSalesChart = function (charts) {
-    var chartData = normalizeSalesData(charts);
-
+    var chartsApi = getChartsApi();
     if (
-      typeof window.Chart !== "function" ||
-      chartData.labels.length === 0 ||
-      chartData.datasets.length === 0
+      !chartsApi ||
+      typeof chartsApi.renderSalesVehicleCategoryChart !== "function"
     ) {
       setUnavailableState("salesVehicleCategory", true);
       if (salesChartInstance) {
@@ -299,111 +234,19 @@
       return;
     }
 
-    setUnavailableState("salesVehicleCategory", false);
-    var canvas = document.getElementById("admin-sales-vehicle-category-chart");
-    if (!canvas) {
-      return;
-    }
-
-    if (salesChartInstance) {
-      salesChartInstance.data.labels = chartData.labels;
-      salesChartInstance.data.datasets = chartData.datasets;
-      salesChartInstance.update("none");
-      return;
-    }
-
-    salesChartInstance = new window.Chart(canvas, {
-      type: "line",
-      data: chartData,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          title: {
-            display: false,
-          },
-          legend: {
-            position: "top",
-            labels: {
-              boxWidth: 34,
-              boxHeight: 11,
-              padding: 10,
-              font: {
-                size: 10,
-              },
-            },
-          },
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: "value",
-              font: {
-                size: 12,
-              },
-            },
-            ticks: {
-              precision: 0,
-              font: {
-                size: 10,
-              },
-            },
-            grid: {
-              color: "rgba(18, 18, 18, 0.08)",
-            },
-          },
-          x: {
-            title: {
-              display: true,
-              text: "Date",
-              font: {
-                size: 12,
-              },
-            },
-            ticks: {
-              font: {
-                size: 10,
-              },
-            },
-            grid: {
-              color: "rgba(18, 18, 18, 0.08)",
-            },
-          },
-        },
-      },
+    salesChartInstance = chartsApi.renderSalesVehicleCategoryChart({
+      charts: charts,
+      currentChart: salesChartInstance,
+      canvasId: "admin-sales-vehicle-category-chart",
+      setUnavailableState: setUnavailableState,
     });
   };
 
   var renderMostRentedChart = function (charts) {
-    var rentData =
-      charts && typeof charts === "object"
-        ? charts.mostRentedVehicleCategory || {}
-        : {};
-    var labels = Array.isArray(rentData.labels)
-      ? rentData.labels.map(String)
-      : [];
-    var datasets = Array.isArray(rentData.datasets) ? rentData.datasets : [];
-    var dataset = datasets[0] || {};
-    var values = toNumericArray(dataset.data);
-
-    if (values.length < labels.length) {
-      for (var pad = values.length; pad < labels.length; pad += 1) {
-        values.push(0);
-      }
-    } else if (values.length > labels.length) {
-      values = values.slice(0, labels.length);
-    }
-
-    var backgroundColor = Array.isArray(dataset.backgroundColor)
-      ? dataset.backgroundColor
-      : ["#f75b7a", "#f6a340", "#f4ca55"];
-
+    var chartsApi = getChartsApi();
     if (
-      typeof window.Chart !== "function" ||
-      labels.length === 0 ||
-      values.length === 0
+      !chartsApi ||
+      typeof chartsApi.renderMostRentedFleetChart !== "function"
     ) {
       setUnavailableState("mostRentedVehicleCategory", true);
       if (rentChartInstance) {
@@ -413,53 +256,11 @@
       return;
     }
 
-    setUnavailableState("mostRentedVehicleCategory", false);
-    var canvas = document.getElementById("admin-most-rented-category-chart");
-    if (!canvas) {
-      return;
-    }
-
-    var chartData = {
-      labels: labels,
-      datasets: [
-        {
-          data: values,
-          backgroundColor: backgroundColor,
-          borderWidth: 1,
-          borderColor: "#ffffff",
-        },
-      ],
-    };
-
-    if (rentChartInstance) {
-      rentChartInstance.data = chartData;
-      rentChartInstance.update("none");
-      return;
-    }
-
-    rentChartInstance = new window.Chart(canvas, {
-      type: "pie",
-      data: chartData,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          title: {
-            display: false,
-          },
-          legend: {
-            position: "top",
-            labels: {
-              boxWidth: 10,
-              boxHeight: 10,
-              padding: 10,
-              font: {
-                size: 8,
-              },
-            },
-          },
-        },
-      },
+    rentChartInstance = chartsApi.renderMostRentedFleetChart({
+      charts: charts,
+      currentChart: rentChartInstance,
+      canvasId: "admin-most-rented-category-chart",
+      setUnavailableState: setUnavailableState,
     });
   };
 

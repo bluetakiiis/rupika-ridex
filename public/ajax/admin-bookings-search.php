@@ -2,8 +2,7 @@
 /**
  * Purpose: Return matching booking IDs for live admin all-bookings table search.
  * Website Section: Admin Bookings AJAX.
- * Developer Notes: Keep payload minimal so the client can filter already-rendered rows.
- */
+*/
 
 require_once __DIR__ . '/../../config/database.php';
 

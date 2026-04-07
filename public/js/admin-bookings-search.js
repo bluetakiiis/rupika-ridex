@@ -1,8 +1,7 @@
 /**
  * Purpose: Live AJAX filter for admin all-bookings table.
  * Website Section: Admin Booking Management.
- * Developer Notes: Filter by visible row text on each keystroke and provide suggestions that open booking modal.
- */
+*/
 
 (function () {
   const searchInput = document.querySelector(
