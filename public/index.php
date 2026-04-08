@@ -6,6 +6,18 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/Helpers/vehicle_json_sync.php';
 require_once __DIR__ . '/../src/Helpers/runtime_sync.php';
+require_once __DIR__ . '/../src/Helpers/booking_flow.php';
+require_once __DIR__ . '/../src/Helpers/auth.php';
+require_once __DIR__ . '/../src/Helpers/validation.php';
+require_once __DIR__ . '/../src/Helpers/url.php';
+require_once __DIR__ . '/../src/Helpers/logs.php';
+require_once __DIR__ . '/../src/Models/BaseModel.php';
+require_once __DIR__ . '/../src/Models/Category.php';
+require_once __DIR__ . '/../src/Models/Session.php';
+require_once __DIR__ . '/../src/Models/User.php';
+require_once __DIR__ . '/../src/Models/Booking.php';
+require_once __DIR__ . '/../src/Models/Payment.php';
+require_once __DIR__ . '/../src/Models/Vehicle.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
 	session_start();
@@ -27,6 +39,7 @@ $toBoolEnv = static function ($value): bool {
 
 $defaultLegacyMirror = strtolower((string) env('APP_ENV', 'production')) === 'local' ? '1' : '0';
 $enableLegacyVehicleJsonMirror = $toBoolEnv(env('ENABLE_LEGACY_JSON_MIRROR', $defaultLegacyMirror));
+$enableGpsRuntimeCoverage = $toBoolEnv(env('ENABLE_GPS_RUNTIME_COVERAGE', '0'));
 
 $legacyVehicleJsonSyncDir = APP_ROOT . '/var/cache/vehicles-json';
 $mirrorVehicleJsonFiles = static function (string $sourceDir, string $targetDir) use ($enableLegacyVehicleJsonMirror): void {
@@ -89,6 +102,14 @@ $adminLoginError = '';
 $adminLoginEmail = '';
 $adminLoginEmailInvalid = false;
 $adminLoginPasswordInvalid = false;
+$userLoginError = '';
+$userLoginIdentifier = '';
+$userLoginIdentifierInvalid = false;
+$userLoginPasswordInvalid = false;
+$userRegisterErrors = [];
+$userRegisterOld = [];
+$userRegisterSuccessEmail = '';
+$userPostAuthRedirect = 'index.php';
 
 $isAdminLoginPost =
 	$_SERVER['REQUEST_METHOD'] === 'POST'
@@ -97,6 +118,26 @@ $isAdminLoginPost =
 $isAdminLogoutPost =
 	$_SERVER['REQUEST_METHOD'] === 'POST'
 	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'admin-logout';
+
+$isUserRegisterPost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'user-register';
+
+$isUserLoginPost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'user-login';
+
+$isUserLogoutPost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'user-logout';
+
+$isUserBookingCreatePost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'user-booking-create';
+
+$isUserBookingCancellationRequestPost =
+	$_SERVER['REQUEST_METHOD'] === 'POST'
+	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'user-request-booking-cancellation';
 
 $isAdminDeleteVehiclePost =
 	$_SERVER['REQUEST_METHOD'] === 'POST'
@@ -134,29 +175,12 @@ $isAdminDeleteBookingPost =
 	$_SERVER['REQUEST_METHOD'] === 'POST'
 	&& strtolower(trim((string) ($_POST['action'] ?? ''))) === 'admin-delete-booking';
 
+$normalizePostAuthRedirect = static function ($rawRedirect): string {
+	return ridex_normalize_post_auth_redirect($rawRedirect);
+};
+
 $ensureVehicleSoftDeleteColumn = static function (PDO $pdo): void {
-	static $checked = false;
-	if ($checked) {
-		return;
-	}
-	$checked = true;
-
-	try {
-		$columnCheckStmt = $pdo->query(
-			"SELECT COUNT(*)
-			 FROM INFORMATION_SCHEMA.COLUMNS
-			 WHERE TABLE_SCHEMA = DATABASE()
-				AND TABLE_NAME = 'vehicles'
-				AND COLUMN_NAME = 'deleted_at'"
-		);
-		$hasDeletedAtColumn = (int) $columnCheckStmt->fetchColumn() > 0;
-
-		if (!$hasDeletedAtColumn) {
-			$pdo->exec('ALTER TABLE vehicles ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER updated_at');
-		}
-	} catch (Throwable $exception) {
-		error_log('Ensure vehicles.deleted_at column failed: ' . $exception->getMessage());
-	}
+	ridex_basemodel_ensure_vehicle_soft_delete_column($pdo);
 };
 
 $ensureGpsLogsTable = static function (PDO $pdo): void {
@@ -179,22 +203,7 @@ $ensureGpsLogsTable = static function (PDO $pdo): void {
 };
 
 $ensurePaymentsTable = static function (PDO $pdo): void {
-	$pdo->exec(
-		'CREATE TABLE IF NOT EXISTS payments (
-			id INT AUTO_INCREMENT PRIMARY KEY,
-			booking_id INT NOT NULL,
-			amount INT NOT NULL,
-			method ENUM("khalti","cash") NOT NULL,
-			status ENUM("initiated","pending","success","failed","cancelled","refunded") NOT NULL,
-			transaction_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			pidx VARCHAR(100),
-			provider_response LONGTEXT,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			CONSTRAINT fk_payments_booking FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
-			CHECK (provider_response IS NULL OR JSON_VALID(provider_response))
-		)'
-	);
+	ridex_payment_ensure_table($pdo);
 };
 
 $ensureVehicleGpsCoverage = static function () use ($ensureGpsLogsTable): void {
@@ -275,15 +284,233 @@ $ensureVehicleGpsCoverage = static function () use ($ensureGpsLogsTable): void {
 			$pdo->rollBack();
 		}
 
-		error_log('Vehicle GPS normalization failed: ' . $exception->getMessage());
+		ridex_log_exception('Vehicle GPS normalization failed', $exception);
 	}
 };
 
-if ($isAdminLogoutPost) {
-	unset($_SESSION['auth_user'], $_SESSION['admin_login_flash']);
+if ($isAdminLogoutPost || $isUserLogoutPost) {
+	ridex_session_clear_auth_context();
 	session_regenerate_id(true);
-	header('Location: index.php', true, 303);
-	exit;
+	ridex_redirect('index.php', 303);
+}
+
+if (!$isUserRegisterPost) {
+	$userRegisterFlash = ridex_session_pull_flash('user_register_flash');
+	if (!empty($userRegisterFlash)) {
+		$userRegisterErrors = isset($userRegisterFlash['errors']) && is_array($userRegisterFlash['errors'])
+			? $userRegisterFlash['errors']
+			: [];
+		$userRegisterOld = isset($userRegisterFlash['old']) && is_array($userRegisterFlash['old'])
+			? $userRegisterFlash['old']
+			: [];
+		$userPostAuthRedirect = $normalizePostAuthRedirect($userRegisterOld['post_auth_redirect'] ?? $userPostAuthRedirect);
+	}
+
+	$userRegisterSuccess = ridex_session_pull_flash('user_register_success');
+	if (!empty($userRegisterSuccess)) {
+		$userRegisterSuccessEmail = trim((string) ($userRegisterSuccess['email'] ?? ''));
+	}
+}
+
+if ($isUserRegisterPost) {
+	$userPostAuthRedirectInput = $normalizePostAuthRedirect($_POST['post_auth_redirect'] ?? 'index.php');
+	$userPostAuthRedirect = $userPostAuthRedirectInput;
+	$allowedProvinces = ['Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'];
+
+	$firstName = trim((string) ($_POST['first_name'] ?? ''));
+	$lastName = trim((string) ($_POST['last_name'] ?? ''));
+	$dateOfBirthRaw = trim((string) ($_POST['date_of_birth'] ?? ''));
+	$dateOfBirth = ridex_normalize_date_for_storage($dateOfBirthRaw);
+	$driversId = trim((string) ($_POST['drivers_id'] ?? ''));
+	$phoneNumberRaw = trim((string) ($_POST['phone'] ?? ''));
+	$phoneParts = ridex_normalize_phone_for_storage($phoneNumberRaw);
+	$phoneLocalDigits = (string) ($phoneParts['local_digits'] ?? '');
+	$phoneNumber = (string) ($phoneParts['formatted'] ?? '+977 ');
+	$email = strtolower(trim((string) ($_POST['email'] ?? '')));
+	$street = trim((string) ($_POST['street'] ?? ''));
+	$postCode = trim((string) ($_POST['post_code'] ?? ''));
+	$city = trim((string) ($_POST['city'] ?? ''));
+	$province = trim((string) ($_POST['province'] ?? ''));
+	if ($province === '') {
+		$province = 'Bagmati';
+	}
+	$password = (string) ($_POST['password'] ?? '');
+
+	$subscribeNewsletter = ridex_bool_from_form_value($_POST['subscribe_newsletter'] ?? '');
+
+	$termsPrivacyAccepted = ridex_bool_from_form_value($_POST['terms_privacy'] ?? '');
+	$termsDepositAccepted = ridex_bool_from_form_value($_POST['terms_deposit'] ?? '');
+	$termsDamageAccepted = ridex_bool_from_form_value($_POST['terms_damage'] ?? '');
+
+	$userRegisterOld = [
+		'first_name' => $firstName,
+		'last_name' => $lastName,
+		'date_of_birth' => $dateOfBirthRaw,
+		'drivers_id' => $driversId,
+		'phone' => $phoneNumberRaw === '' ? '' : $phoneNumber,
+		'email' => $email,
+		'street' => $street,
+		'post_code' => $postCode,
+		'city' => $city,
+		'province' => $province,
+		'subscribe_newsletter' => $subscribeNewsletter,
+		'terms_privacy' => $termsPrivacyAccepted,
+		'terms_deposit' => $termsDepositAccepted,
+		'terms_damage' => $termsDamageAccepted,
+		'post_auth_redirect' => $userPostAuthRedirectInput,
+	];
+
+	$registrationErrors = [];
+
+	if ($firstName === '') {
+		$registrationErrors[] = 'First name is required.';
+	}
+
+	if ($lastName === '') {
+		$registrationErrors[] = 'Last name is required.';
+	}
+
+	if ($dateOfBirth === '') {
+		$registrationErrors[] = 'Date of birth is required.';
+	} else {
+		try {
+			$dateOfBirthDate = new DateTimeImmutable($dateOfBirth);
+			$today = new DateTimeImmutable('today');
+			if ($dateOfBirthDate > $today) {
+				$registrationErrors[] = 'Date of birth cannot be in the future.';
+			} elseif ((int) $dateOfBirthDate->diff($today)->y < 18) {
+				$registrationErrors[] = 'You must be at least 18 years old to register.';
+			}
+		} catch (Throwable $exception) {
+			$registrationErrors[] = 'Date of birth is invalid.';
+		}
+	}
+
+	if ($driversId === '') {
+		$registrationErrors[] = 'Driver\'s ID is required.';
+	}
+
+	if ($phoneNumberRaw === '') {
+		$registrationErrors[] = 'Phone number is required.';
+	} else {
+		if (!ridex_is_valid_nepal_phone_local_digits($phoneLocalDigits)) {
+			$registrationErrors[] = 'Phone number must be in +977 9XXXXXXXXX format.';
+		}
+	}
+
+	if ($email === '') {
+		$registrationErrors[] = 'Email is required.';
+	} elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+		$registrationErrors[] = 'Email format is invalid.';
+	}
+
+	if ($street === '') {
+		$registrationErrors[] = 'Street is required.';
+	}
+
+	if ($postCode === '') {
+		$registrationErrors[] = 'Post code is required.';
+	}
+
+	if ($city === '') {
+		$registrationErrors[] = 'City is required.';
+	}
+
+	if ($province === '' || !in_array($province, $allowedProvinces, true)) {
+		$registrationErrors[] = 'Please select a valid province.';
+	}
+
+	if (!ridex_is_valid_password_strength($password)) {
+		$registrationErrors[] = 'Password must contain lowercase, uppercase, digit, symbol, and at least 8 characters.';
+	}
+
+	if (!$termsPrivacyAccepted || !$termsDepositAccepted || !$termsDamageAccepted) {
+		$registrationErrors[] = 'All policy checkboxes must be accepted to continue.';
+	}
+
+	$redirectWithUserRegisterFlash = static function (array $errors, array $old): void {
+		ridex_session_set_user_register_flash($errors, $old);
+		ridex_redirect('index.php', 303);
+	};
+
+	if (!empty($registrationErrors)) {
+		$redirectWithUserRegisterFlash($registrationErrors, $userRegisterOld);
+	}
+
+	try {
+		$pdo = db();
+
+		$existingUserId = ridex_user_find_id_by_email($pdo, $email);
+		if ($existingUserId > 0) {
+			$registrationErrors[] = 'This email is already registered.';
+			$redirectWithUserRegisterFlash($registrationErrors, $userRegisterOld);
+		}
+
+		$existingDriverIdUser = ridex_user_find_id_by_driver_id($pdo, $driversId, 'user');
+		if ($existingDriverIdUser > 0) {
+			$registrationErrors[] = 'This Driver ID has already been used to create an account.';
+			$redirectWithUserRegisterFlash($registrationErrors, $userRegisterOld);
+		}
+
+		$passwordHash = password_hash($password, PASSWORD_DEFAULT);
+		if (!is_string($passwordHash) || $passwordHash === '') {
+			throw new RuntimeException('Unable to hash user password.');
+		}
+
+		$fullName = trim($firstName . ' ' . $lastName);
+		if ($fullName === '') {
+			$fullName = 'Ridex User';
+		}
+
+		$addressParts = array_values(array_filter([
+			$street,
+			$city,
+			$province,
+		], static function ($value): bool {
+			return trim((string) $value) !== '';
+		}));
+		$address = implode(', ', $addressParts);
+
+		$newUserId = ridex_user_create_registered_user($pdo, [
+			'name' => $fullName,
+			'first_name' => $firstName,
+			'last_name' => $lastName,
+			'email' => $email,
+			'password_hash' => $passwordHash,
+			'phone' => $phoneNumber,
+			'address' => $address,
+			'date_of_birth' => $dateOfBirth,
+			'street' => $street,
+			'post_code' => $postCode,
+			'city' => $city,
+			'province' => $province,
+			'drivers_id' => $driversId,
+		]);
+		session_regenerate_id(true);
+		$_SESSION['auth_user'] = [
+			'id' => $newUserId,
+			'name' => $fullName,
+			'email' => $email,
+			'phone' => $phoneNumber,
+			'drivers_id' => $driversId,
+			'date_of_birth' => $dateOfBirth,
+			'role' => 'user',
+		];
+
+		ridex_session_pull_flash('user_register_flash');
+		$successfulRegisterRedirect = $normalizePostAuthRedirect($userPostAuthRedirectInput);
+		if ($successfulRegisterRedirect !== 'index.php') {
+			ridex_session_pull_flash('user_register_success');
+			ridex_redirect($successfulRegisterRedirect, 303);
+		}
+
+		ridex_session_set_user_register_success($email, $subscribeNewsletter);
+		ridex_redirect('index.php', 303);
+	} catch (Throwable $exception) {
+		ridex_log_exception('User register failed', $exception);
+		$registrationErrors[] = 'Unable to create account right now. Please try again.';
+		$redirectWithUserRegisterFlash($registrationErrors, $userRegisterOld);
+	}
 }
 
 // admin fleet delete: process delete requests from the Manage Fleet confirmation modal
@@ -327,7 +554,7 @@ if ($isAdminDeleteVehiclePost) {
 	} else {
 		$deleteRedirectQuery['fleet_type'] = $deleteFleetType;
 	}
-	$deleteRedirectUrl = 'index.php?' . http_build_query($deleteRedirectQuery);
+	$deleteRedirectUrl = ridex_url_with_query($deleteRedirectQuery);
 
 	if ($deleteVehicleId > 0) {
 		try {
@@ -419,7 +646,7 @@ if ($isAdminCompleteBookingPost || $isAdminApproveBookingCancellationPost || $is
 	if ($bookingId > 0 && !$isAdminDeleteBookingPost) {
 		$redirectQuery['open_booking_id'] = $bookingId;
 	}
-	$redirectUrl = 'index.php?' . http_build_query($redirectQuery);
+	$redirectUrl = ridex_url_with_query($redirectQuery);
 
 	if ($bookingId <= 0) {
 		header('Location: ' . $redirectUrl, true, 303);
@@ -524,6 +751,18 @@ if ($isAdminCompleteBookingPost || $isAdminApproveBookingCancellationPost || $is
 
 			$actualReturnDateTime = $parseAdminDateTime($returnTimeInput);
 			if (!($actualReturnDateTime instanceof DateTimeImmutable)) {
+				$pdo->rollBack();
+				header('Location: ' . $redirectUrl, true, 303);
+				exit;
+			}
+
+			if ($actualReturnDateTime > $nowDateTime) {
+				$pdo->rollBack();
+				header('Location: ' . $redirectUrl, true, 303);
+				exit;
+			}
+
+			if ($pickupDateTime instanceof DateTimeImmutable && $actualReturnDateTime < $pickupDateTime) {
 				$pdo->rollBack();
 				header('Location: ' . $redirectUrl, true, 303);
 				exit;
@@ -721,7 +960,7 @@ if ($isAdminCreateVehiclePost) {
 		'fleet_mode' => 'type',
 		'fleet_type' => $fleetType,
 	];
-	$redirectUrl = 'index.php?' . http_build_query($redirectQuery);
+	$redirectUrl = ridex_url_with_query($redirectQuery);
 
 	$parseServiceDate = static function (string $rawDate): ?string {
 		$normalizedDate = trim($rawDate);
@@ -747,6 +986,13 @@ if ($isAdminCreateVehiclePost) {
 	$lastServiceDate = $parseServiceDate($lastServiceDateRaw);
 	$transmissionType = $transmissionMap[$transmissionInput] ?? '';
 	$pricePerDay = is_finite($pricePerDayRaw) ? (int) round($pricePerDayRaw) : 0;
+	$isLastServiceDateInFuture = false;
+	if ($lastServiceDate !== null) {
+		$lastServiceDateTime = DateTimeImmutable::createFromFormat('!Y-m-d', $lastServiceDate);
+		if ($lastServiceDateTime instanceof DateTimeImmutable) {
+			$isLastServiceDateInFuture = $lastServiceDateTime > new DateTimeImmutable('today');
+		}
+	}
 
 	$upload = $_FILES['image_file'] ?? null;
 	$hasValidUploadArray = is_array($upload)
@@ -768,6 +1014,7 @@ if ($isAdminCreateVehiclePost) {
 		|| $gpsId === ''
 		|| !in_array($status, $allowedVehicleStatuses, true)
 		|| $lastServiceDate === null
+		|| $isLastServiceDateInFuture
 		|| $description === ''
 		|| $uploadError !== UPLOAD_ERR_OK;
 
@@ -867,6 +1114,14 @@ if ($isAdminCreateVehiclePost) {
 		]);
 		if ((int) $duplicateLicenseStmt->fetchColumn() > 0) {
 			throw new RuntimeException('Vehicle license plate already exists.');
+		}
+
+		$duplicateGpsStmt = $pdo->prepare('SELECT id FROM vehicles WHERE LOWER(gps_id) = LOWER(:gps_id) LIMIT 1 FOR UPDATE');
+		$duplicateGpsStmt->execute([
+			'gps_id' => $gpsId,
+		]);
+		if ((int) $duplicateGpsStmt->fetchColumn() > 0) {
+			throw new RuntimeException('Vehicle GPS ID already exists.');
 		}
 
 		try {
@@ -1079,6 +1334,13 @@ if ($isAdminCreateVehiclePost) {
 		$lastServiceDate = $parseServiceDate($lastServiceDateRaw);
 		$transmissionType = $transmissionMap[$transmissionInput] ?? '';
 		$pricePerDay = is_finite($pricePerDayRaw) ? (int) round($pricePerDayRaw) : 0;
+		$isLastServiceDateInFuture = false;
+		if ($lastServiceDate !== null) {
+			$lastServiceDateTime = DateTimeImmutable::createFromFormat('!Y-m-d', $lastServiceDate);
+			if ($lastServiceDateTime instanceof DateTimeImmutable) {
+				$isLastServiceDateInFuture = $lastServiceDateTime > new DateTimeImmutable('today');
+			}
+		}
 
 		$upload = $_FILES['image_file'] ?? null;
 		$hasValidUploadArray = is_array($upload)
@@ -1106,6 +1368,7 @@ if ($isAdminCreateVehiclePost) {
 			|| $gpsId === ''
 			|| !in_array($status, $allowedVehicleStatuses, true)
 			|| $lastServiceDate === null
+			|| $isLastServiceDateInFuture
 			|| $description === '';
 
 		if ($hasMissingRequiredData) {
@@ -1230,6 +1493,15 @@ if ($isAdminCreateVehiclePost) {
 			]);
 			if ((int) $duplicateLicenseStmt->fetchColumn() > 0) {
 				throw new RuntimeException('Vehicle license plate already exists.');
+			}
+
+			$duplicateGpsStmt = $pdo->prepare('SELECT id FROM vehicles WHERE LOWER(gps_id) = LOWER(:gps_id) AND id <> :id LIMIT 1 FOR UPDATE');
+			$duplicateGpsStmt->execute([
+				'gps_id' => $gpsId,
+				'id' => $vehicleId,
+			]);
+			if ((int) $duplicateGpsStmt->fetchColumn() > 0) {
+				throw new RuntimeException('Vehicle GPS ID already exists.');
 			}
 
 			if ($isReplacingImage) {
@@ -1454,6 +1726,15 @@ if ($isAdminStartMaintenancePost || $isAdminUpdateMaintenancePost || $isAdminCom
 				exit;
 			}
 
+			if ($estimateDateTime < new DateTimeImmutable('today')) {
+				$pdo->rollBack();
+				$redirectQuery['fleet_mode'] = 'status';
+				$redirectQuery['fleet_status'] = 'maintenance';
+				unset($redirectQuery['fleet_type']);
+				header('Location: ' . $redirectWithVehicle($redirectQuery, $vehicleId), true, 303);
+				exit;
+			}
+
 			$estimateCompletionDate = $estimateDateTime->format('Y-m-d');
 			if (!is_finite($serviceCost) || $serviceCost < 0) {
 				$serviceCost = 0;
@@ -1616,112 +1897,124 @@ $redirectWithAdminLoginFlash = static function (
 	bool $emailInvalid,
 	bool $passwordInvalid
 ): void {
-	$_SESSION['admin_login_flash'] = [
-		'error' => $error,
-		'email' => $email,
-		'email_invalid' => $emailInvalid,
-		'password_invalid' => $passwordInvalid,
-	];
-
-	header('Location: index.php', true, 303);
-	exit;
+	ridex_session_set_admin_login_flash(
+		$error,
+		$email,
+		$emailInvalid,
+		$passwordInvalid
+	);
+	ridex_redirect('index.php', 303);
 };
 
-if (!$isAdminLoginPost && isset($_SESSION['admin_login_flash']) && is_array($_SESSION['admin_login_flash'])) {
-	$adminFlash = $_SESSION['admin_login_flash'];
-	unset($_SESSION['admin_login_flash']);
+// user login: keep validation state for one request only so modal errors survive redirect.
+$redirectWithUserLoginFlash = static function (
+	string $error,
+	string $identifier,
+	bool $identifierInvalid,
+	bool $passwordInvalid,
+	string $postAuthRedirect = 'index.php'
+) use ($normalizePostAuthRedirect): void {
+	ridex_session_set_user_login_flash(
+		$error,
+		$identifier,
+		$identifierInvalid,
+		$passwordInvalid,
+		$normalizePostAuthRedirect($postAuthRedirect)
+	);
+	ridex_redirect('index.php', 303);
+};
 
-	$adminLoginError = trim((string) ($adminFlash['error'] ?? ''));
-	$adminLoginEmail = trim((string) ($adminFlash['email'] ?? ''));
-	$adminLoginEmailInvalid = (bool) ($adminFlash['email_invalid'] ?? false);
-	$adminLoginPasswordInvalid = (bool) ($adminFlash['password_invalid'] ?? false);
+$minimumBookingAge = 18;
+$bookingAgeRestrictionMessage = 'You must be at least 18 years old to book a vehicle.';
+$bookingActiveOverlapMessage = 'booking conflict. you already have an active booking during this time.';
+$bookingVehicleOverdueMessage = 'vehicle overdue. return current vehicle before booking again.';
+
+$calculateAgeFromDateOfBirth = static function ($rawDateOfBirth): ?int {
+	$normalizedDateOfBirth = trim((string) $rawDateOfBirth);
+	if ($normalizedDateOfBirth === '') {
+		return null;
+	}
+
+	$dateOfBirthDate = DateTimeImmutable::createFromFormat('!Y-m-d', $normalizedDateOfBirth);
+	if (!($dateOfBirthDate instanceof DateTimeImmutable)) {
+		try {
+			$dateOfBirthDate = new DateTimeImmutable($normalizedDateOfBirth);
+		} catch (Throwable $exception) {
+			return null;
+		}
+	}
+
+	$todayDate = new DateTimeImmutable('today');
+	if ($dateOfBirthDate > $todayDate) {
+		return null;
+	}
+
+	return (int) $dateOfBirthDate->diff($todayDate)->y;
+};
+
+$isBookingPageRedirect = static function (string $redirectUrl): bool {
+	$normalizedRedirectUrl = trim($redirectUrl);
+	if ($normalizedRedirectUrl === '') {
+		return false;
+	}
+
+	$parsedRedirectUrl = parse_url($normalizedRedirectUrl);
+	if (!is_array($parsedRedirectUrl)) {
+		return false;
+	}
+
+	$redirectQueryValues = [];
+	if (isset($parsedRedirectUrl['query'])) {
+		parse_str((string) $parsedRedirectUrl['query'], $redirectQueryValues);
+	}
+	if (!is_array($redirectQueryValues)) {
+		return false;
+	}
+
+	$redirectPage = strtolower(trim((string) ($redirectQueryValues['page'] ?? '')));
+	return in_array($redirectPage, ['booking-select', 'booking-engine', 'booking-checkout'], true);
+};
+
+$isUserEligibleForBooking = static function (array $userRow) use ($calculateAgeFromDateOfBirth, $minimumBookingAge): bool {
+	$userAge = $calculateAgeFromDateOfBirth($userRow['date_of_birth'] ?? '');
+	return $userAge !== null && $userAge >= $minimumBookingAge;
+};
+
+if (!$isAdminLoginPost) {
+	$adminFlash = ridex_session_pull_flash('admin_login_flash');
+	if (!empty($adminFlash)) {
+		$adminLoginError = trim((string) ($adminFlash['error'] ?? ''));
+		$adminLoginEmail = trim((string) ($adminFlash['email'] ?? ''));
+		$adminLoginEmailInvalid = (bool) ($adminFlash['email_invalid'] ?? false);
+		$adminLoginPasswordInvalid = (bool) ($adminFlash['password_invalid'] ?? false);
+	}
+}
+
+if (!$isUserLoginPost) {
+	$userLoginFlash = ridex_session_pull_flash('user_login_flash');
+	if (!empty($userLoginFlash)) {
+		$userLoginError = trim((string) ($userLoginFlash['error'] ?? ''));
+		$userLoginIdentifier = trim((string) ($userLoginFlash['identifier'] ?? ''));
+		$userLoginIdentifierInvalid = (bool) ($userLoginFlash['identifier_invalid'] ?? false);
+		$userLoginPasswordInvalid = (bool) ($userLoginFlash['password_invalid'] ?? false);
+		$userPostAuthRedirect = $normalizePostAuthRedirect($userLoginFlash['post_auth_redirect'] ?? $userPostAuthRedirect);
+	}
 }
 
 // admin login: ensure the default admin credential exists with hashed password
 $ensureDefaultAdminAccount = static function (PDO $pdo): void {
-	$defaultAdminEmail = 'rupikadangol@gmail.com';
-	$defaultAdminPassword = '12345678';
-	$defaultAdminHash = password_hash($defaultAdminPassword, PASSWORD_DEFAULT);
-
-	$canonicalUserStmt = $pdo->prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
-	$canonicalUserStmt->execute(['email' => $defaultAdminEmail]);
-	$canonicalUserId = (int) $canonicalUserStmt->fetchColumn();
-
-	if ($canonicalUserId <= 0) {
-		$existingAdminStmt = $pdo->prepare('SELECT id FROM users WHERE role = :role ORDER BY id ASC LIMIT 1');
-		$existingAdminStmt->execute(['role' => 'admin']);
-		$existingAdminId = (int) $existingAdminStmt->fetchColumn();
-
-		if ($existingAdminId > 0) {
-			$reuseAdminStmt = $pdo->prepare(
-				'UPDATE users
-				 SET name = :name,
-					 email = :email,
-					 password_hash = :password_hash,
-					 role = :role,
-					 updated_at = CURRENT_TIMESTAMP
-				 WHERE id = :id'
-			);
-			$reuseAdminStmt->execute([
-				'name' => 'Ridex Admin',
-				'email' => $defaultAdminEmail,
-				'password_hash' => $defaultAdminHash,
-				'role' => 'admin',
-				'id' => $existingAdminId,
-			]);
-			$canonicalUserId = $existingAdminId;
-		} else {
-			$insertAdminStmt = $pdo->prepare(
-				'INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
-				 VALUES (:name, :email, :password_hash, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
-			);
-			$insertAdminStmt->execute([
-				'name' => 'Ridex Admin',
-				'email' => $defaultAdminEmail,
-				'password_hash' => $defaultAdminHash,
-				'role' => 'admin',
-			]);
-			$canonicalUserId = (int) $pdo->lastInsertId();
-		}
-	}
-
-	if ($canonicalUserId > 0) {
-		$normalizeCanonicalStmt = $pdo->prepare(
-			'UPDATE users
-			 SET name = :name,
-				 email = :email,
-				 password_hash = :password_hash,
-				 role = :role,
-				 updated_at = CURRENT_TIMESTAMP
-			 WHERE id = :id'
-		);
-		$normalizeCanonicalStmt->execute([
-			'name' => 'Ridex Admin',
-			'email' => $defaultAdminEmail,
-			'password_hash' => $defaultAdminHash,
-			'role' => 'admin',
-			'id' => $canonicalUserId,
-		]);
-
-		$demoteOtherAdminsStmt = $pdo->prepare(
-			'UPDATE users
-			 SET role = :user_role,
-				 updated_at = CURRENT_TIMESTAMP
-			 WHERE role = :admin_role AND id <> :id'
-		);
-		$demoteOtherAdminsStmt->execute([
-			'user_role' => 'user',
-			'admin_role' => 'admin',
-			'id' => $canonicalUserId,
-		]);
-	}
+	ridex_user_ensure_default_admin_account(
+		$pdo,
+		'rupikadangol@gmail.com',
+		'12345678'
+	);
 };
 
 // admin login: always ensure the default admin account exists in users(role=admin).
 try {
 	$ensureDefaultAdminAccount(db());
 } catch (Throwable $exception) {
-	error_log('Default admin setup failed: ' . $exception->getMessage());
+	ridex_log_exception('Default admin setup failed', $exception);
 }
 
 // admin login: process modal login post and redirect to dashboard placeholder on success
@@ -1799,18 +2092,108 @@ if ($isAdminLoginPost) {
 						'phone' => trim((string) ($adminUser['phone'] ?? '')),
 						'role' => 'admin',
 					];
-
-					header('Location: index.php?page=admin-dashboard', true, 302);
-					exit;
+					ridex_redirect('index.php?page=admin-dashboard', 302);
 				}
 			}
 		} catch (Throwable $exception) {
-			error_log('Admin login failed: ' . $exception->getMessage());
+			ridex_log_exception('Admin login failed', $exception);
 			$redirectWithAdminLoginFlash(
 				'Unable to complete admin login right now. Please try again.',
 				$adminLoginEmail,
 				true,
 				true
+			);
+		}
+	}
+}
+
+if ($isUserLoginPost) {
+	$userLoginIdentifier = trim((string) ($_POST['user_identifier'] ?? ''));
+	$userLoginPassword = (string) ($_POST['user_password'] ?? '');
+	$userPostAuthRedirectInput = $normalizePostAuthRedirect($_POST['post_auth_redirect'] ?? 'index.php');
+	$userPostAuthRedirect = $userPostAuthRedirectInput;
+
+	if ($userLoginIdentifier === '' && $userLoginPassword === '') {
+		$redirectWithUserLoginFlash(
+			'Email/Driver ID and password are required.',
+			'',
+			true,
+			true,
+			$userPostAuthRedirectInput
+		);
+	} elseif ($userLoginIdentifier === '') {
+		$redirectWithUserLoginFlash(
+			'Email or Driver ID is required.',
+			'',
+			true,
+			false,
+			$userPostAuthRedirectInput
+		);
+	} elseif ($userLoginPassword === '') {
+		$redirectWithUserLoginFlash(
+			'Password is required.',
+			$userLoginIdentifier,
+			false,
+			true,
+			$userPostAuthRedirectInput
+		);
+	} else {
+		try {
+			$pdo = db();
+
+			$userAccount = ridex_user_find_for_login($pdo, $userLoginIdentifier);
+
+			$invalidCredentialsMessage = 'Invalid email/driver ID or password. Please try again.';
+
+			if (!is_array($userAccount)) {
+				$redirectWithUserLoginFlash(
+					$invalidCredentialsMessage,
+					$userLoginIdentifier,
+					true,
+					true,
+					$userPostAuthRedirectInput
+				);
+			}
+
+			$passwordMatches = password_verify(
+				$userLoginPassword,
+				(string) ($userAccount['password_hash'] ?? '')
+			);
+
+			if (!$passwordMatches) {
+				$redirectWithUserLoginFlash(
+					$invalidCredentialsMessage,
+					$userLoginIdentifier,
+					true,
+					true,
+					$userPostAuthRedirectInput
+				);
+			}
+
+			$requiresBookingAgeCheck = $isBookingPageRedirect($userPostAuthRedirectInput);
+			if ($requiresBookingAgeCheck && !$isUserEligibleForBooking($userAccount)) {
+				$redirectWithUserLoginFlash(
+					$bookingAgeRestrictionMessage,
+					$userLoginIdentifier,
+					false,
+					false,
+					$userPostAuthRedirectInput
+				);
+			}
+
+			session_regenerate_id(true);
+			$_SESSION['auth_user'] = ridex_build_user_session_payload($userAccount, 'user');
+
+			ridex_session_pull_flash('user_login_flash');
+			ridex_redirect($userPostAuthRedirectInput, 302);
+		} catch (Throwable $exception) {
+			ridex_log_exception('User login failed', $exception);
+			$redirectWithUserLoginFlash(
+				'Unable to complete user login right now. Please try again.',
+				$userLoginIdentifier,
+				true,
+				true,
+				$userPostAuthRedirectInput
 			);
 		}
 	}
@@ -1838,7 +2221,7 @@ $runVehicleSync = static function (bool $preferDbTimestamps = false) use (
 		$mirrorVehicleJsonFiles($vehicleJsonSyncDir, $legacyVehicleJsonSyncDir);
 	} catch (Throwable $exception) {
 		// Keep page rendering available even if JSON sync fails.
-		error_log('Vehicle JSON sync failed: ' . $exception->getMessage());
+		ridex_log_exception('Vehicle JSON sync failed', $exception);
 	}
 };
 
@@ -1858,8 +2241,10 @@ $syncSequentialAutoIncrement = static function (): void {
 $runVehicleSync(false);
 // Ensure soft-delete metadata exists for vehicle visibility and booking history preservation.
 $ensureVehicleSoftDeleteColumn(db());
-// Normalize GPS IDs to GP-{vehicle_id} and seed placeholder gps_logs rows for existing vehicles.
-$ensureVehicleGpsCoverage();
+// Optional GPS normalization is disabled by default to keep non-GPS deployments lightweight.
+if ($enableGpsRuntimeCoverage) {
+	$ensureVehicleGpsCoverage();
+}
 // Keep DB booking statuses aligned with time-based lifecycle transitions.
 $syncBookingLifecycleStatuses();
 // Keep users/payments connected to current booking records and fill required fields.
@@ -1871,14 +2256,8 @@ register_shutdown_function(static function () use ($runVehicleSync): void {
 	$runVehicleSync(true);
 });
 
-$allowedVehicleTypes = ['cars', 'bikes', 'luxury'];
-
-$sanitizeVehicleType = static function ($rawType) use ($allowedVehicleTypes): string {
-	$normalizedType = strtolower(trim((string) $rawType));
-
-	return in_array($normalizedType, $allowedVehicleTypes, true)
-		? $normalizedType
-		: 'cars';
+$sanitizeVehicleType = static function ($rawType): string {
+	return ridex_category_sanitize_vehicle_type($rawType, 'cars');
 };
 
 $getAdminDashboardPayload = static function (): array {
@@ -2364,73 +2743,599 @@ $getAdminLiveTrackingPayload = static function (): array {
 };
 
 $parseDateTimeSafe = static function ($rawDate): ?DateTimeImmutable {
-	$rawDate = trim((string) $rawDate);
-	if ($rawDate === '') {
-		return null;
+	return ridex_vehicle_parse_datetime_safe($rawDate);
+};
+
+$resolveEffectiveVehicleStatus = static function (array $vehicleRow, ?DateTimeImmutable $referenceDateTime = null): string {
+	return ridex_vehicle_resolve_effective_status($vehicleRow, $referenceDateTime);
+};
+
+$parseBookingDateTimeFromParts = static function (string $datePart, string $timePart): ?DateTimeImmutable {
+	return ridex_parse_booking_datetime_from_parts($datePart, $timePart);
+};
+
+$sanitizeBookingSearchInput = static function (array $source): array {
+	return ridex_sanitize_booking_search_input($source);
+};
+
+$buildBookingSearchQuery = static function (array $bookingSearch): array {
+	return ridex_build_booking_search_query($bookingSearch);
+};
+
+$calculateBookingPriceBreakdown = static function (
+	int $pricePerDay,
+	DateTimeImmutable $pickupDateTime,
+	DateTimeImmutable $returnDateTime
+): array {
+	return ridex_calculate_booking_price_breakdown($pricePerDay, $pickupDateTime, $returnDateTime);
+};
+
+$isVehicleAvailableForBookingWindow = static function (
+	PDO $pdo,
+	int $vehicleId,
+	DateTimeImmutable $pickupDateTime,
+	DateTimeImmutable $returnDateTime
+): bool {
+	return ridex_is_vehicle_available_for_booking_window($pdo, $vehicleId, $pickupDateTime, $returnDateTime);
+};
+
+$doesUserHaveOverlappingBookingWindow = static function (
+	PDO $pdo,
+	int $userId,
+	DateTimeImmutable $pickupDateTime,
+	DateTimeImmutable $returnDateTime
+): bool {
+	return ridex_does_user_have_overlapping_booking_window($pdo, $userId, $pickupDateTime, $returnDateTime);
+};
+
+$doesUserHaveOverdueBooking = static function (PDO $pdo, int $userId): bool {
+	return ridex_user_has_overdue_booking($pdo, $userId);
+};
+
+$isVehicleBlockedByOverdueStatus = static function (PDO $pdo, int $vehicleId): bool {
+	return ridex_is_vehicle_blocked_by_overdue_status($pdo, $vehicleId);
+};
+
+$fetchBookableVehicleById = static function (PDO $pdo, int $vehicleId): ?array {
+	return ridex_fetch_bookable_vehicle_by_id($pdo, $vehicleId);
+};
+
+$fetchBookingReceiptData = static function (PDO $pdo, int $bookingId): ?array {
+	return ridex_fetch_booking_receipt_data($pdo, $bookingId);
+};
+
+$formatBookingTimeline = static function (?DateTimeImmutable $dateTime): string {
+	return ridex_format_booking_timeline($dateTime);
+};
+
+if ($isUserBookingCreatePost) {
+	$bookingSearch = $sanitizeBookingSearchInput($_POST);
+	$vehicleId = (int) ($_POST['vehicle_id'] ?? 0);
+	$vehicleType = $sanitizeVehicleType($_POST['vehicle_type'] ?? 'cars');
+	$paymentMethod = 'pay_on_arrival';
+
+	$checkoutRedirectQuery = array_merge(
+		[
+			'page' => 'booking-checkout',
+			'vehicle_id' => $vehicleId,
+			'vehicle_type' => $vehicleType,
+		],
+		$buildBookingSearchQuery($bookingSearch)
+	);
+
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isUserSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'user');
+	if (!$isUserSession) {
+		$redirectWithUserLoginFlash(
+			'Please log in before confirming a booking.',
+			'',
+			false,
+			false,
+			'index.php?' . http_build_query($checkoutRedirectQuery)
+		);
+	}
+
+	if (!$isUserEligibleForBooking($sessionUser)) {
+		$fallbackQuery = array_merge(
+			[
+				'page' => 'booking-select',
+				'vehicle_type' => $vehicleType,
+				'booking_notice' => $bookingAgeRestrictionMessage,
+			],
+			$buildBookingSearchQuery($bookingSearch)
+		);
+		header('Location: index.php?' . http_build_query($fallbackQuery), true, 303);
+		exit;
+	}
+
+	if (!$bookingSearch['is_valid'] || $vehicleId <= 0) {
+		$bookingNotice = !empty($bookingSearch['errors'])
+			? (string) $bookingSearch['errors'][0]
+			: 'Please complete all booking fields before continuing.';
+		$checkoutRedirectQuery['booking_notice'] = $bookingNotice;
+		header('Location: index.php?' . http_build_query($checkoutRedirectQuery), true, 303);
+		exit;
+	}
+
+	$userId = (int) ($sessionUser['id'] ?? 0);
+	if ($userId <= 0) {
+		header('Location: index.php', true, 303);
+		exit;
+	}
+
+	$pickupDateTime = $bookingSearch['pickup_datetime'];
+	$returnDateTime = $bookingSearch['return_datetime'];
+	if (!($pickupDateTime instanceof DateTimeImmutable) || !($returnDateTime instanceof DateTimeImmutable)) {
+		$checkoutRedirectQuery['booking_notice'] = 'Pickup and return datetime are invalid.';
+		header('Location: index.php?' . http_build_query($checkoutRedirectQuery), true, 303);
+		exit;
 	}
 
 	try {
-		return new DateTimeImmutable($rawDate);
+		$pdo = db();
+		$hasUserOverdueBooking = $doesUserHaveOverdueBooking($pdo, $userId);
+		if ($hasUserOverdueBooking) {
+			$checkoutRedirectQuery['booking_notice'] = $bookingVehicleOverdueMessage;
+			header('Location: index.php?' . http_build_query($checkoutRedirectQuery), true, 303);
+			exit;
+		}
+
+		$vehicleRow = $fetchBookableVehicleById($pdo, $vehicleId);
+		if (!is_array($vehicleRow)) {
+			$checkoutRedirectQuery['booking_notice'] = 'Selected vehicle was not found.';
+			header('Location: index.php?' . http_build_query($checkoutRedirectQuery), true, 303);
+			exit;
+		}
+
+		$isVehicleOverdueBlocked = $isVehicleBlockedByOverdueStatus($pdo, $vehicleId);
+		if ($isVehicleOverdueBlocked) {
+			$fallbackQuery = array_merge(
+				[
+					'page' => 'booking-select',
+					'vehicle_type' => $vehicleType,
+					'booking_notice' => $bookingVehicleOverdueMessage,
+				],
+				$buildBookingSearchQuery($bookingSearch)
+			);
+			header('Location: index.php?' . http_build_query($fallbackQuery), true, 303);
+			exit;
+		}
+
+		$isAvailable = $isVehicleAvailableForBookingWindow($pdo, $vehicleId, $pickupDateTime, $returnDateTime);
+		if (!$isAvailable) {
+			$fallbackQuery = array_merge(
+				[
+					'page' => 'booking-select',
+					'vehicle_type' => $vehicleType,
+					'booking_notice' => 'Vehicle unavailable for the selected date range.',
+				],
+				$buildBookingSearchQuery($bookingSearch)
+			);
+			header('Location: index.php?' . http_build_query($fallbackQuery), true, 303);
+			exit;
+		}
+
+		$hasUserOverlap = $doesUserHaveOverlappingBookingWindow($pdo, $userId, $pickupDateTime, $returnDateTime);
+		if ($hasUserOverlap) {
+			$engineRedirectQuery = array_merge(
+				[
+					'page' => 'booking-engine',
+					'vehicle_id' => $vehicleId,
+					'vehicle_type' => $vehicleType,
+					'booking_notice' => $bookingActiveOverlapMessage,
+				],
+				$buildBookingSearchQuery($bookingSearch)
+			);
+			header('Location: index.php?' . http_build_query($engineRedirectQuery), true, 303);
+			exit;
+		}
+
+		$vehiclePricePerDay = (int) ($vehicleRow['price_per_day'] ?? 0);
+		$priceBreakdown = $calculateBookingPriceBreakdown($vehiclePricePerDay, $pickupDateTime, $returnDateTime);
+
+		$userDriversId = trim((string) ($sessionUser['drivers_id'] ?? ''));
+		if ($userDriversId === '') {
+			$userLookupStmt = $pdo->prepare(
+				'SELECT drivers_id
+				 FROM users
+				 WHERE id = :lookup_user_id
+				 LIMIT 1'
+			);
+			$userLookupStmt->execute([
+				'lookup_user_id' => $userId,
+			]);
+			$userDriversId = trim((string) $userLookupStmt->fetchColumn());
+		}
+		if ($userDriversId === '') {
+			$userDriversId = 'RIDEX-' . str_pad((string) $userId, 4, '0', STR_PAD_LEFT);
+		}
+
+		$pdo->beginTransaction();
+
+		$nextBookingIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 AS next_booking_id FROM bookings FOR UPDATE');
+		$nextBookingId = (int) $nextBookingIdStmt->fetchColumn();
+		if ($nextBookingId <= 0) {
+			$nextBookingId = 1;
+		}
+
+		$bookingNumber = '#RX-' . str_pad((string) $nextBookingId, 4, '0', STR_PAD_LEFT);
+		$bookingPaymentStatus = 'pending';
+		$paidAmount = 0;
+
+		$insertBookingStmt = $pdo->prepare(
+			'INSERT INTO bookings (
+				id,
+				booking_number,
+				user_id,
+				vehicle_id,
+				pickup_location,
+				return_location,
+				pickup_datetime,
+				return_datetime,
+				status,
+				payment_status,
+				payment_method,
+				total_amount,
+				paid_amount,
+				late_fee,
+				drivers_id,
+				created_at,
+				updated_at
+			) VALUES (
+				:id,
+				:booking_number,
+				:user_id,
+				:vehicle_id,
+				:pickup_location,
+				:return_location,
+				:pickup_datetime,
+				:return_datetime,
+				:status,
+				:payment_status,
+				:payment_method,
+				:total_amount,
+				:paid_amount,
+				:late_fee,
+				:drivers_id,
+				CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP
+			)'
+		);
+		$insertBookingStmt->execute([
+			'id' => $nextBookingId,
+			'booking_number' => $bookingNumber,
+			'user_id' => $userId,
+			'vehicle_id' => $vehicleId,
+			'pickup_location' => (string) ($bookingSearch['pickup_location'] ?? ''),
+			'return_location' => (string) ($bookingSearch['return_location'] ?? ''),
+			'pickup_datetime' => $pickupDateTime->format('Y-m-d H:i:s'),
+			'return_datetime' => $returnDateTime->format('Y-m-d H:i:s'),
+			'status' => 'reserved',
+			'payment_status' => $bookingPaymentStatus,
+			'payment_method' => $paymentMethod,
+			'total_amount' => (int) ($priceBreakdown['total_amount'] ?? 0),
+			'paid_amount' => $paidAmount,
+			'late_fee' => 0,
+			'drivers_id' => $userDriversId,
+		]);
+
+		$paymentAmount = (int) ($priceBreakdown['total_amount'] ?? 0);
+		$paymentMethodValue = 'cash';
+		$paymentStatusValue = 'initiated';
+		$paymentProviderResponse = json_encode([
+			'source' => 'booking-flow',
+			'payment_method' => $paymentMethod,
+		], JSON_UNESCAPED_SLASHES);
+		if (!is_string($paymentProviderResponse)) {
+			$paymentProviderResponse = '{}';
+		}
+
+		$insertPaymentStmt = $pdo->prepare(
+			'INSERT INTO payments (
+				booking_id,
+				amount,
+				method,
+				status,
+				transaction_time,
+				pidx,
+				provider_response,
+				created_at,
+				updated_at
+			) VALUES (
+				:booking_id,
+				:amount,
+				:method,
+				:status,
+				CURRENT_TIMESTAMP,
+				NULL,
+				:provider_response,
+				CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP
+			)'
+		);
+		$insertPaymentStmt->execute([
+			'booking_id' => $nextBookingId,
+			'amount' => $paymentAmount,
+			'method' => $paymentMethodValue,
+			'status' => $paymentStatusValue,
+			'provider_response' => $paymentProviderResponse,
+		]);
+
+		$pdo->commit();
+
+		try {
+			$bookingFlowToken = bin2hex(random_bytes(12));
+		} catch (Throwable $randomException) {
+			$bookingFlowToken = sha1(uniqid((string) $nextBookingId, true));
+		}
+
+		$_SESSION['booking_flow_lock'] = [
+			'booking_id' => $nextBookingId,
+			'token' => $bookingFlowToken,
+		];
+
+		header(
+			'Location: index.php?page=booking-thank-you&booking_id=' . urlencode((string) $nextBookingId) . '&flow_token=' . urlencode($bookingFlowToken),
+			true,
+			303
+		);
+		exit;
 	} catch (Throwable $exception) {
-		return null;
-	}
-};
-
-$resolveEffectiveVehicleStatus = static function (array $vehicleRow, ?DateTimeImmutable $referenceDateTime = null) use ($parseDateTimeSafe): string {
-	$referenceDateTime = $referenceDateTime ?? new DateTimeImmutable('now');
-	$deletedAt = trim((string) ($vehicleRow['deleted_at'] ?? $vehicleRow['vehicle_deleted_at'] ?? ''));
-	if ($deletedAt !== '') {
-		return 'unavailable';
-	}
-
-	$activeBookingStatus = strtolower(trim((string) ($vehicleRow['active_booking_status'] ?? $vehicleRow['vehicle_active_booking_status'] ?? '')));
-	if (in_array($activeBookingStatus, ['reserved', 'on_trip', 'overdue'], true)) {
-		return $activeBookingStatus;
-	}
-
-	$rawStatus = strtolower(trim((string) ($vehicleRow['status'] ?? $vehicleRow['vehicle_current_status'] ?? '')));
-	if ($rawStatus === '') {
-		$rawStatus = 'available';
-	}
-
-	$activePickupDateTime = $parseDateTimeSafe($vehicleRow['active_pickup_datetime'] ?? $vehicleRow['vehicle_active_pickup_datetime'] ?? null);
-	$activeReturnDateTime = $parseDateTimeSafe($vehicleRow['active_return_datetime'] ?? $vehicleRow['vehicle_active_return_datetime'] ?? null);
-	$upcomingPickupDateTime = $parseDateTimeSafe($vehicleRow['upcoming_pickup_datetime'] ?? $vehicleRow['vehicle_upcoming_pickup_datetime'] ?? null);
-
-	if ($activePickupDateTime instanceof DateTimeImmutable && $activeReturnDateTime instanceof DateTimeImmutable) {
-		if ($referenceDateTime > $activeReturnDateTime) {
-			return 'overdue';
+		if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+			$pdo->rollBack();
 		}
 
-		if ($referenceDateTime >= $activePickupDateTime) {
-			return 'on_trip';
+		error_log('User booking create failed: ' . $exception->getMessage());
+		$checkoutRedirectQuery['booking_notice'] = 'Unable to create booking right now. Please try again.';
+		header('Location: index.php?' . http_build_query($checkoutRedirectQuery), true, 303);
+		exit;
+	}
+}
+
+if ($isUserBookingCancellationRequestPost) {
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isUserSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'user');
+
+	$allowedHistoryTabs = ['active', 'pending', 'completed', 'cancelled'];
+	$historyTab = strtolower(trim((string) ($_POST['history_tab'] ?? 'pending')));
+	if (!in_array($historyTab, $allowedHistoryTabs, true)) {
+		$historyTab = 'pending';
+	}
+
+	$historyRedirectQuery = [
+		'page' => 'user-booking-history',
+		'tab' => $historyTab,
+	];
+
+	$redirectToHistoryWithNotice = static function (array $baseQuery, string $notice = ''): void {
+		if ($notice !== '') {
+			$baseQuery['booking_notice'] = $notice;
 		}
 
-		$reservedWindowStart = $activePickupDateTime->sub(new DateInterval('P2D'));
-		if ($referenceDateTime >= $reservedWindowStart) {
-			return 'reserved';
+		header('Location: index.php?' . http_build_query($baseQuery), true, 303);
+		exit;
+	};
+
+	if (!$isUserSession) {
+		$redirectWithUserLoginFlash(
+			'Please log in to manage your bookings.',
+			'',
+			false,
+			false,
+			'index.php?' . http_build_query($historyRedirectQuery)
+		);
+	}
+
+	$userId = (int) ($sessionUser['id'] ?? 0);
+	$bookingId = (int) ($_POST['booking_id'] ?? 0);
+	if ($userId <= 0 || $bookingId <= 0) {
+		$redirectToHistoryWithNotice($historyRedirectQuery, 'Invalid cancellation request.');
+	}
+
+	try {
+		$pdo = db();
+		$pdo->beginTransaction();
+
+		$bookingLookupStmt = $pdo->prepare(
+			'SELECT
+				id,
+				user_id,
+				vehicle_id,
+				status,
+				payment_status,
+				pickup_datetime
+			 FROM bookings
+			 WHERE id = :booking_id
+			 LIMIT 1
+			 FOR UPDATE'
+		);
+		$bookingLookupStmt->execute([
+			'booking_id' => $bookingId,
+		]);
+		$bookingRow = $bookingLookupStmt->fetch();
+
+		if (!is_array($bookingRow) || (int) ($bookingRow['user_id'] ?? 0) !== $userId) {
+			$pdo->rollBack();
+			$redirectToHistoryWithNotice($historyRedirectQuery, 'Booking not found.');
 		}
-	}
 
-	if ($upcomingPickupDateTime instanceof DateTimeImmutable) {
-		$reservedWindowStart = $upcomingPickupDateTime->sub(new DateInterval('P2D'));
-		if ($referenceDateTime >= $reservedWindowStart && $referenceDateTime < $upcomingPickupDateTime) {
-			return 'reserved';
+		$bookingStatus = strtolower(trim((string) ($bookingRow['status'] ?? '')));
+		$pickupDateTime = $parseDateTimeSafe($bookingRow['pickup_datetime'] ?? null);
+		$nowDateTime = new DateTimeImmutable('now');
+
+		if ($bookingStatus !== 'reserved' || ($pickupDateTime instanceof DateTimeImmutable && $nowDateTime >= $pickupDateTime)) {
+			$pdo->rollBack();
+			$redirectToHistoryWithNotice($historyRedirectQuery, 'Only pending bookings can be cancelled.');
 		}
-	}
 
-	if ($rawStatus === 'maintenance') {
-		return 'maintenance';
-	}
+		$paymentStatus = strtolower(trim((string) ($bookingRow['payment_status'] ?? 'pending')));
+		$nextPaymentStatus = $paymentStatus === 'refunded' ? 'refunded' : 'cancelled';
 
-	if ($rawStatus === 'unavailable') {
-		return 'unavailable';
-	}
+		$cancelBookingStmt = $pdo->prepare(
+			'UPDATE bookings
+			 SET status = :status,
+				 payment_status = :payment_status,
+				 updated_at = CURRENT_TIMESTAMP
+			 WHERE id = :booking_id
+			 LIMIT 1'
+		);
+		$cancelBookingStmt->execute([
+			'status' => 'cancelled',
+			'payment_status' => $nextPaymentStatus,
+			'booking_id' => $bookingId,
+		]);
 
-	return 'available';
-};
+		$vehicleId = (int) ($bookingRow['vehicle_id'] ?? 0);
+		if ($vehicleId > 0) {
+			$remainingActiveBookingStmt = $pdo->prepare(
+				'SELECT COUNT(*)
+				 FROM bookings
+				 WHERE vehicle_id = :vehicle_id
+					AND id <> :booking_id
+					AND status IN ("reserved", "on_trip", "overdue")'
+			);
+			$remainingActiveBookingStmt->execute([
+				'vehicle_id' => $vehicleId,
+				'booking_id' => $bookingId,
+			]);
+			$remainingActiveBookingCount = (int) $remainingActiveBookingStmt->fetchColumn();
+
+			if ($remainingActiveBookingCount <= 0) {
+				$markVehicleAvailableStmt = $pdo->prepare(
+					'UPDATE vehicles
+					 SET status = :status,
+						 updated_at = CURRENT_TIMESTAMP
+					 WHERE id = :vehicle_id
+					 LIMIT 1'
+				);
+				$markVehicleAvailableStmt->execute([
+					'status' => 'available',
+					'vehicle_id' => $vehicleId,
+				]);
+			}
+		}
+
+		$pdo->commit();
+		$redirectToHistoryWithNotice($historyRedirectQuery, 'Cancellation request submitted. Wait for admin approval.');
+	} catch (Throwable $exception) {
+		if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+
+		error_log('User booking cancellation request failed: ' . $exception->getMessage());
+		$redirectToHistoryWithNotice($historyRedirectQuery, 'Unable to submit cancellation request right now.');
+	}
+}
 
 $page = strtolower(trim((string) ($_GET['page'] ?? 'home')));
+
+if ($page === 'user-auth-lookup') {
+	header('Content-Type: application/json; charset=UTF-8');
+	header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+	header('Pragma: no-cache');
+	header('X-Content-Type-Options: nosniff');
+
+	if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+		http_response_code(405);
+		echo '{"ok":false,"message":"Method not allowed."}';
+		exit;
+	}
+
+	$lookupStep = strtolower(trim((string) ($_POST['step'] ?? '')));
+	$lookupResponse = [
+		'ok' => false,
+		'message' => 'Invalid request.',
+	];
+	$lookupStatusCode = 200;
+
+	try {
+		$pdo = db();
+
+		if ($lookupStep === 'email') {
+			$lookupEmail = strtolower(trim((string) ($_POST['email'] ?? '')));
+			if ($lookupEmail === '' || !filter_var($lookupEmail, FILTER_VALIDATE_EMAIL)) {
+				$lookupStatusCode = 400;
+				$lookupResponse['message'] = 'Please enter a valid email address.';
+			} else {
+				$lookupUserId = ridex_user_find_id_by_email($pdo, $lookupEmail, 'user');
+
+				if ($lookupUserId > 0) {
+					$lookupResponse = [
+						'ok' => true,
+						'message' => 'Email verified.',
+					];
+				} else {
+					$lookupResponse['message'] = 'No user account found for this email.';
+				}
+			}
+		} elseif ($lookupStep === 'driver') {
+			$lookupEmail = strtolower(trim((string) ($_POST['email'] ?? '')));
+			$lookupDriversId = trim((string) ($_POST['drivers_id'] ?? ''));
+
+			if ($lookupEmail === '' || !filter_var($lookupEmail, FILTER_VALIDATE_EMAIL)) {
+				$lookupStatusCode = 400;
+				$lookupResponse['message'] = 'Please verify your email first.';
+			} elseif ($lookupDriversId === '') {
+				$lookupStatusCode = 400;
+				$lookupResponse['message'] = 'Please enter your Driver ID.';
+			} else {
+				$lookupUserId = ridex_user_find_id_by_email_and_driver($pdo, $lookupEmail, $lookupDriversId);
+
+				if ($lookupUserId > 0) {
+					$lookupResponse = [
+						'ok' => true,
+						'message' => 'Driver ID verified.',
+					];
+				} else {
+					$lookupResponse['message'] = 'Driver ID does not match the entered email.';
+				}
+			}
+		} elseif ($lookupStep === 'register-driver') {
+			$lookupDriversId = trim((string) ($_POST['drivers_id'] ?? ''));
+
+			if ($lookupDriversId === '') {
+				$lookupStatusCode = 400;
+				$lookupResponse['message'] = 'Please enter your Driver ID.';
+			} else {
+				$lookupUserId = ridex_user_find_id_by_driver_id($pdo, $lookupDriversId, 'user');
+
+				if ($lookupUserId > 0) {
+					$lookupResponse['message'] = 'This Driver ID has already been used to create an account.';
+				} else {
+					$lookupResponse = [
+						'ok' => true,
+						'message' => 'Driver ID is available.',
+					];
+				}
+			}
+		} else {
+			$lookupStatusCode = 400;
+			$lookupResponse['message'] = 'Unknown verification step.';
+		}
+	} catch (Throwable $exception) {
+		error_log('User auth lookup failed: ' . $exception->getMessage());
+		$lookupStatusCode = 500;
+		$lookupResponse = [
+			'ok' => false,
+			'message' => 'Unable to verify right now. Please try again.',
+		];
+	}
+
+	http_response_code($lookupStatusCode);
+	$lookupJson = json_encode(
+		$lookupResponse,
+		JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
+	);
+
+	if (!is_string($lookupJson)) {
+		http_response_code(500);
+		echo '{"ok":false,"message":"Unable to encode response."}';
+		exit;
+	}
+
+	echo $lookupJson;
+	exit;
+}
 
 $bookingSearchKeys = [
 	'pickup-location',
@@ -2455,7 +3360,999 @@ if ($page === 'vehicles' && $isBookingSearchAttempt) {
 	exit;
 }
 
-if ($page === 'vehicles') {
+if ($page === 'booking-select') {
+	$selectedVehicleType = $sanitizeVehicleType($_GET['vehicle_type'] ?? 'cars');
+	$bookingSearch = $sanitizeBookingSearchInput($_GET);
+	$bookingSearchQuery = $buildBookingSearchQuery($bookingSearch);
+	$bookingNotice = trim((string) ($_GET['booking_notice'] ?? ''));
+
+	$selectedFilterTypesRaw = $_GET['types'] ?? [];
+	if (!is_array($selectedFilterTypesRaw) || empty($selectedFilterTypesRaw)) {
+		$selectedFilterTypesRaw = [$selectedVehicleType];
+	}
+	$selectedFilterTypes = [];
+	foreach ($selectedFilterTypesRaw as $rawType) {
+		$normalizedType = strtolower(trim((string) $rawType));
+		if (in_array($normalizedType, ['cars', 'bikes', 'luxury'], true)) {
+			$selectedFilterTypes[] = $normalizedType;
+		}
+	}
+	$selectedFilterTypes = array_values(array_unique($selectedFilterTypes));
+	if (empty($selectedFilterTypes)) {
+		$selectedFilterTypes = [$selectedVehicleType];
+	}
+
+	$selectedTransmissionsRaw = $_GET['transmissions'] ?? [];
+	if (!is_array($selectedTransmissionsRaw)) {
+		$selectedTransmissionsRaw = [];
+	}
+	$selectedTransmissions = [];
+	foreach ($selectedTransmissionsRaw as $rawTransmission) {
+		$normalizedTransmission = strtolower(trim((string) $rawTransmission));
+		if (in_array($normalizedTransmission, ['manual', 'automatic', 'hybrid'], true)) {
+			$selectedTransmissions[] = $normalizedTransmission;
+		}
+	}
+	$selectedTransmissions = array_values(array_unique($selectedTransmissions));
+
+	$selectedSeatsMin = max(0, (int) ($_GET['seats_min'] ?? 0));
+	$selectedPriceMin = max(0, (int) ($_GET['price_min'] ?? 0));
+	$selectedPriceMax = max(0, (int) ($_GET['price_max'] ?? 0));
+	if ($selectedPriceMax > 0 && $selectedPriceMax < $selectedPriceMin) {
+		$tempPrice = $selectedPriceMin;
+		$selectedPriceMin = $selectedPriceMax;
+		$selectedPriceMax = $tempPrice;
+	}
+
+	$selectedSortPrice = strtolower(trim((string) ($_GET['sort_price'] ?? 'high')));
+	if (!in_array($selectedSortPrice, ['low', 'high'], true)) {
+		$selectedSortPrice = 'high';
+	}
+
+	$isFlowStartRequest = trim((string) ($_GET['flow_start'] ?? '')) === '1';
+	if ($isFlowStartRequest) {
+		unset($_SESSION['booking_flow_lock']);
+	}
+
+	$lockedBookingId = (int) (($_SESSION['booking_flow_lock']['booking_id'] ?? 0));
+	if (!$isFlowStartRequest && $lockedBookingId > 0) {
+		header(
+			'Location: index.php?page=booking-thank-you&booking_id=' . urlencode((string) $lockedBookingId),
+			true,
+			303
+		);
+		exit;
+	}
+
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isUserSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'user');
+	if (!$isUserSession) {
+		$authRedirectQuery = array_merge(
+			[
+				'page' => 'booking-select',
+				'vehicle_type' => $selectedVehicleType,
+				'flow_start' => '1',
+			],
+			$bookingSearchQuery
+		);
+
+		if (!empty($selectedFilterTypes)) {
+			$authRedirectQuery['types'] = $selectedFilterTypes;
+		}
+
+		if (!empty($selectedTransmissions)) {
+			$authRedirectQuery['transmissions'] = $selectedTransmissions;
+		}
+
+		if ($selectedSeatsMin > 0) {
+			$authRedirectQuery['seats_min'] = $selectedSeatsMin;
+		}
+
+		if ($selectedPriceMin > 0) {
+			$authRedirectQuery['price_min'] = $selectedPriceMin;
+		}
+
+		if ($selectedPriceMax > 0) {
+			$authRedirectQuery['price_max'] = $selectedPriceMax;
+		}
+
+		$authRedirectQuery['sort_price'] = $selectedSortPrice;
+
+		$redirectWithUserLoginFlash(
+			'Please log in before searching vehicles.',
+			'',
+			false,
+			false,
+			'index.php?' . http_build_query($authRedirectQuery)
+		);
+	}
+
+	$bookingSelectVehicles = [];
+	$bookingNoAvailabilityMessage = '';
+	$userId = (int) ($sessionUser['id'] ?? 0);
+	$isUserBlockedByOverdue = false;
+	$isUserBlockedByActiveOverlap = false;
+	if ($userId > 0) {
+		try {
+			$isUserBlockedByOverdue = $doesUserHaveOverdueBooking(db(), $userId);
+
+			$pickupDateTime = $bookingSearch['pickup_datetime'] ?? null;
+			$returnDateTime = $bookingSearch['return_datetime'] ?? null;
+			if (
+				!$isUserBlockedByOverdue
+				&& $pickupDateTime instanceof DateTimeImmutable
+				&& $returnDateTime instanceof DateTimeImmutable
+			) {
+				$isUserBlockedByActiveOverlap = $doesUserHaveOverlappingBookingWindow(
+					db(),
+					$userId,
+					$pickupDateTime,
+					$returnDateTime
+				);
+			}
+		} catch (Throwable $exception) {
+			ridex_log_exception('Booking select pre-check failed', $exception);
+		}
+	}
+
+	if ($isUserBlockedByOverdue && $bookingNotice === '') {
+		$bookingNotice = $bookingVehicleOverdueMessage;
+	}
+
+	if ($isUserBlockedByActiveOverlap && $bookingNotice === '') {
+		$bookingNotice = $bookingActiveOverlapMessage;
+	}
+
+	if ($isUserBlockedByOverdue || $isUserBlockedByActiveOverlap) {
+		$bookingSelectVehicles = [];
+		$bookingNoAvailabilityMessage = '';
+	} elseif (!$bookingSearch['is_valid']) {
+		if ($bookingNotice === '') {
+			$bookingNotice = !empty($bookingSearch['errors'])
+				? (string) $bookingSearch['errors'][0]
+				: 'Please fill all booking fields to search vehicles.';
+		}
+	} else {
+		try {
+			$pdo = db();
+			$sql = 'SELECT v.*, c.name AS category_name
+				FROM vehicles v
+				INNER JOIN categories c ON c.id = v.category_id
+				WHERE v.deleted_at IS NULL
+					AND v.status NOT IN (:maintenance_status, :overdue_status)
+					AND NOT EXISTS (
+						SELECT 1
+						FROM bookings b_overdue
+						WHERE b_overdue.vehicle_id = v.id
+							AND b_overdue.status = "overdue"
+					)';
+			$params = [
+				'maintenance_status' => 'maintenance',
+				'overdue_status' => 'overdue',
+			];
+
+			$typePlaceholders = [];
+			foreach ($selectedFilterTypes as $typeIndex => $filterType) {
+				$placeholder = 'vehicle_type_' . $typeIndex;
+				$typePlaceholders[] = ':' . $placeholder;
+				$params[$placeholder] = $filterType;
+			}
+			if (!empty($typePlaceholders)) {
+				$sql .= ' AND v.vehicle_type IN (' . implode(', ', $typePlaceholders) . ')';
+			}
+
+			$transmissionPlaceholders = [];
+			foreach ($selectedTransmissions as $transmissionIndex => $filterTransmission) {
+				$placeholder = 'transmission_' . $transmissionIndex;
+				$transmissionPlaceholders[] = ':' . $placeholder;
+				$params[$placeholder] = $filterTransmission;
+			}
+			if (!empty($transmissionPlaceholders)) {
+				$sql .= ' AND LOWER(v.transmission_type) IN (' . implode(', ', $transmissionPlaceholders) . ')';
+			}
+
+			if ($selectedSeatsMin > 0) {
+				$sql .= ' AND COALESCE(v.number_of_seats, 0) >= :minimum_seats';
+				$params['minimum_seats'] = $selectedSeatsMin;
+			}
+
+			if ($selectedPriceMin > 0) {
+				$sql .= ' AND v.price_per_day >= :minimum_price';
+				$params['minimum_price'] = $selectedPriceMin;
+			}
+
+			if ($selectedPriceMax > 0) {
+				$sql .= ' AND v.price_per_day <= :maximum_price';
+				$params['maximum_price'] = $selectedPriceMax;
+			}
+
+			$pickupDateTime = $bookingSearch['pickup_datetime'];
+			$returnDateTime = $bookingSearch['return_datetime'];
+			if ($pickupDateTime instanceof DateTimeImmutable && $returnDateTime instanceof DateTimeImmutable) {
+				$sql .= ' AND NOT EXISTS (
+					SELECT 1
+					FROM bookings b
+					WHERE b.vehicle_id = v.id
+						AND b.status IN ("reserved", "on_trip", "overdue")
+						AND :requested_pickup < b.return_datetime
+						AND :requested_return > DATE_SUB(b.pickup_datetime, INTERVAL 2 DAY)
+				)';
+				$params['requested_pickup'] = $pickupDateTime->format('Y-m-d H:i:s');
+				$params['requested_return'] = $returnDateTime->format('Y-m-d H:i:s');
+			}
+
+			$sql .= $selectedSortPrice === 'low'
+				? ' ORDER BY v.price_per_day ASC, v.id ASC'
+				: ' ORDER BY v.price_per_day DESC, v.id DESC';
+
+			$selectVehiclesStmt = $pdo->prepare($sql);
+			$selectVehiclesStmt->execute($params);
+			$bookingSelectVehicles = $selectVehiclesStmt->fetchAll() ?: [];
+
+			if (empty($bookingSelectVehicles)) {
+				$bookingNoAvailabilityMessage = 'No vehicles available for the selected date and filters.';
+			}
+		} catch (Throwable $exception) {
+			error_log('Booking selection query failed: ' . $exception->getMessage());
+			$bookingSelectVehicles = [];
+			$bookingNoAvailabilityMessage = 'Unable to load vehicles right now. Please try again.';
+		}
+	}
+
+	$title = 'Ridex | Vehicle Selection';
+	$view = 'booking/select';
+	$viewData = [
+		'selectedVehicleType' => $selectedVehicleType,
+		'bookingSearch' => $bookingSearch,
+		'bookingSearchQuery' => $bookingSearchQuery,
+		'selectedFilterTypes' => $selectedFilterTypes,
+		'selectedTransmissions' => $selectedTransmissions,
+		'selectedSeatsMin' => $selectedSeatsMin,
+		'selectedPriceMin' => $selectedPriceMin,
+		'selectedPriceMax' => $selectedPriceMax,
+		'selectedSortPrice' => $selectedSortPrice,
+		'bookingSelectVehicles' => $bookingSelectVehicles,
+		'bookingNotice' => $bookingNotice,
+		'bookingNoAvailabilityMessage' => $bookingNoAvailabilityMessage,
+		'hideFooter' => true,
+	];
+} elseif ($page === 'booking-engine') {
+	$vehicleId = (int) ($_GET['vehicle_id'] ?? 0);
+	$selectedVehicleType = $sanitizeVehicleType($_GET['vehicle_type'] ?? 'cars');
+	$bookingSearch = $sanitizeBookingSearchInput($_GET);
+	$bookingSearchQuery = $buildBookingSearchQuery($bookingSearch);
+	$bookingNotice = trim((string) ($_GET['booking_notice'] ?? ''));
+	$directUnavailable = false;
+	$directAttempt = trim((string) ($_GET['attempt'] ?? '')) === '1';
+	$isFlowStartRequest = trim((string) ($_GET['flow_start'] ?? '')) === '1';
+
+	if ($isFlowStartRequest) {
+		unset($_SESSION['booking_flow_lock']);
+	}
+
+	$lockedBookingId = (int) (($_SESSION['booking_flow_lock']['booking_id'] ?? 0));
+	if (!$isFlowStartRequest && $lockedBookingId > 0) {
+		header(
+			'Location: index.php?page=booking-thank-you&booking_id=' . urlencode((string) $lockedBookingId),
+			true,
+			303
+		);
+		exit;
+	}
+
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isUserSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'user');
+	if (!$isUserSession) {
+		$authRedirectQuery = array_merge(
+			[
+				'page' => 'booking-engine',
+				'vehicle_id' => $vehicleId,
+				'vehicle_type' => $selectedVehicleType,
+				'flow_start' => '1',
+			],
+			$bookingSearchQuery
+		);
+
+		if ($directAttempt) {
+			$authRedirectQuery['attempt'] = '1';
+		}
+
+		$redirectWithUserLoginFlash(
+			'Please log in before continuing to booking checkout.',
+			'',
+			false,
+			false,
+			'index.php?' . http_build_query($authRedirectQuery)
+		);
+	}
+
+	$sessionUserId = (int) ($sessionUser['id'] ?? 0);
+	if ($sessionUserId <= 0) {
+		ridex_redirect('index.php', 303);
+	}
+
+	if (!$isUserEligibleForBooking($sessionUser)) {
+		$underageRedirectQuery = array_merge(
+			[
+				'page' => 'booking-select',
+				'vehicle_type' => $selectedVehicleType,
+				'booking_notice' => $bookingAgeRestrictionMessage,
+			],
+			$bookingSearchQuery
+		);
+		header('Location: index.php?' . http_build_query($underageRedirectQuery), true, 303);
+		exit;
+	}
+
+	$userHasOverdueBooking = false;
+	try {
+		$userHasOverdueBooking = $doesUserHaveOverdueBooking(db(), $sessionUserId);
+	} catch (Throwable $exception) {
+		ridex_log_exception('Booking engine overdue check failed', $exception);
+	}
+	if ($userHasOverdueBooking && $bookingNotice === '') {
+		$bookingNotice = $bookingVehicleOverdueMessage;
+	}
+
+	$selectedVehicle = null;
+	if ($vehicleId > 0) {
+		try {
+			$selectedVehicle = $fetchBookableVehicleById(db(), $vehicleId);
+			if (is_array($selectedVehicle)) {
+				$selectedVehicleType = $sanitizeVehicleType($selectedVehicle['vehicle_type'] ?? $selectedVehicleType);
+			}
+		} catch (Throwable $exception) {
+			error_log('Booking engine vehicle lookup failed: ' . $exception->getMessage());
+			$selectedVehicle = null;
+		}
+	}
+
+	if ($directAttempt) {
+		if ($userHasOverdueBooking) {
+			$bookingNotice = $bookingVehicleOverdueMessage;
+			$directUnavailable = true;
+		} elseif (!$bookingSearch['is_valid']) {
+			$bookingNotice = !empty($bookingSearch['errors'])
+				? (string) $bookingSearch['errors'][0]
+				: 'Please fill all booking fields.';
+		} elseif (!is_array($selectedVehicle)) {
+			$bookingNotice = 'Selected vehicle is unavailable.';
+			$directUnavailable = true;
+		} else {
+			$pickupDateTime = $bookingSearch['pickup_datetime'];
+			$returnDateTime = $bookingSearch['return_datetime'];
+			if ($pickupDateTime instanceof DateTimeImmutable && $returnDateTime instanceof DateTimeImmutable) {
+				try {
+					$pdo = db();
+
+					$isDirectVehicleOverdueBlocked = $isVehicleBlockedByOverdueStatus($pdo, $vehicleId);
+					if ($isDirectVehicleOverdueBlocked) {
+						$directUnavailable = true;
+						$bookingNotice = $bookingVehicleOverdueMessage;
+					} else {
+						$hasUserOverlap = $doesUserHaveOverlappingBookingWindow($pdo, $sessionUserId, $pickupDateTime, $returnDateTime);
+						if ($hasUserOverlap) {
+							$bookingNotice = $bookingActiveOverlapMessage;
+						} else {
+							$isDirectVehicleAvailable = $isVehicleAvailableForBookingWindow($pdo, $vehicleId, $pickupDateTime, $returnDateTime);
+							if ($isDirectVehicleAvailable) {
+								$checkoutQuery = array_merge(
+									[
+										'page' => 'booking-checkout',
+										'vehicle_id' => $vehicleId,
+										'vehicle_type' => $selectedVehicleType,
+									],
+									$bookingSearchQuery
+								);
+								header('Location: index.php?' . http_build_query($checkoutQuery), true, 303);
+								exit;
+							}
+
+							$directUnavailable = true;
+							$bookingNotice = 'Vehicle unavailable for the selected date range. Please search alternatives.';
+						}
+					}
+				} catch (Throwable $exception) {
+					error_log('Direct booking availability check failed: ' . $exception->getMessage());
+					$directUnavailable = true;
+					$bookingNotice = 'Unable to verify vehicle availability right now.';
+				}
+			}
+		}
+	}
+
+	$fallbackSearchUrl = 'index.php?' . http_build_query(array_merge(
+		[
+			'page' => 'booking-select',
+			'vehicle_type' => $selectedVehicleType,
+		],
+		$bookingSearchQuery
+	));
+
+	$title = 'Ridex | Booking Engine';
+	$view = 'booking/form';
+	$viewData = [
+		'selectedVehicle' => $selectedVehicle,
+		'selectedVehicleType' => $selectedVehicleType,
+		'selectedVehicleId' => $vehicleId,
+		'bookingSearch' => $bookingSearch,
+		'bookingNotice' => $bookingNotice,
+		'directUnavailable' => $directUnavailable,
+		'flowStart' => $isFlowStartRequest,
+		'directSearchUrl' => $fallbackSearchUrl,
+	];
+} elseif ($page === 'booking-checkout') {
+	$vehicleId = (int) ($_GET['vehicle_id'] ?? 0);
+	$selectedVehicleType = $sanitizeVehicleType($_GET['vehicle_type'] ?? 'cars');
+	$bookingSearch = $sanitizeBookingSearchInput($_GET);
+	$bookingSearchQuery = $buildBookingSearchQuery($bookingSearch);
+	$bookingNotice = trim((string) ($_GET['booking_notice'] ?? ''));
+	$isFlowStartRequest = trim((string) ($_GET['flow_start'] ?? '')) === '1';
+
+	if ($isFlowStartRequest) {
+		unset($_SESSION['booking_flow_lock']);
+	}
+
+	$lockedBookingId = (int) (($_SESSION['booking_flow_lock']['booking_id'] ?? 0));
+	if (!$isFlowStartRequest && $lockedBookingId > 0) {
+		header(
+			'Location: index.php?page=booking-thank-you&booking_id=' . urlencode((string) $lockedBookingId),
+			true,
+			303
+		);
+		exit;
+	}
+
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isUserSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'user');
+	if (!$isUserSession) {
+		$authRedirectQuery = array_merge(
+			[
+				'page' => 'booking-checkout',
+				'vehicle_id' => $vehicleId,
+				'vehicle_type' => $selectedVehicleType,
+			],
+			$bookingSearchQuery
+		);
+
+		if ($isFlowStartRequest) {
+			$authRedirectQuery['flow_start'] = '1';
+		}
+
+		$redirectWithUserLoginFlash(
+			'Please log in before opening checkout.',
+			'',
+			false,
+			false,
+			'index.php?' . http_build_query($authRedirectQuery)
+		);
+	}
+
+	$sessionUserId = (int) ($sessionUser['id'] ?? 0);
+	if ($sessionUserId <= 0) {
+		ridex_redirect('index.php', 303);
+	}
+
+	if (!$isUserEligibleForBooking($sessionUser)) {
+		$underageRedirectQuery = array_merge(
+			[
+				'page' => 'booking-select',
+				'vehicle_type' => $selectedVehicleType,
+				'booking_notice' => $bookingAgeRestrictionMessage,
+			],
+			$bookingSearchQuery
+		);
+		header('Location: index.php?' . http_build_query($underageRedirectQuery), true, 303);
+		exit;
+	}
+
+	$userHasOverdueBooking = false;
+	try {
+		$userHasOverdueBooking = $doesUserHaveOverdueBooking(db(), $sessionUserId);
+	} catch (Throwable $exception) {
+		ridex_log_exception('Booking checkout overdue check failed', $exception);
+	}
+	if ($userHasOverdueBooking) {
+		$engineRedirectQuery = array_merge(
+			[
+				'page' => 'booking-engine',
+				'vehicle_id' => $vehicleId,
+				'vehicle_type' => $selectedVehicleType,
+				'booking_notice' => $bookingVehicleOverdueMessage,
+			],
+			$bookingSearchQuery
+		);
+		header('Location: index.php?' . http_build_query($engineRedirectQuery), true, 303);
+		exit;
+	}
+
+	if (!$bookingSearch['is_valid']) {
+		$fallbackQuery = array_merge(
+			[
+				'page' => 'booking-select',
+				'vehicle_type' => $selectedVehicleType,
+				'booking_notice' => 'Please complete booking details first.',
+			],
+			$bookingSearchQuery
+		);
+		header('Location: index.php?' . http_build_query($fallbackQuery), true, 303);
+		exit;
+	}
+
+	$checkoutVehicle = null;
+	$bookingPriceBreakdown = null;
+	$checkoutBookingNumberPreview = '#RX-0001';
+
+	$pickupDateTime = $bookingSearch['pickup_datetime'];
+	$returnDateTime = $bookingSearch['return_datetime'];
+
+	try {
+		$pdo = db();
+		$nextBookingIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 AS next_booking_id FROM bookings');
+		$nextPreviewBookingId = (int) $nextBookingIdStmt->fetchColumn();
+		if ($nextPreviewBookingId > 0) {
+			$checkoutBookingNumberPreview = '#RX-' . str_pad((string) $nextPreviewBookingId, 4, '0', STR_PAD_LEFT);
+		}
+
+		$checkoutVehicle = $fetchBookableVehicleById($pdo, $vehicleId);
+		if (!is_array($checkoutVehicle)) {
+			$fallbackQuery = array_merge(
+				[
+					'page' => 'booking-select',
+					'vehicle_type' => $selectedVehicleType,
+					'booking_notice' => 'Selected vehicle was not found.',
+				],
+				$bookingSearchQuery
+			);
+			header('Location: index.php?' . http_build_query($fallbackQuery), true, 303);
+			exit;
+		}
+
+		$selectedVehicleType = $sanitizeVehicleType($checkoutVehicle['vehicle_type'] ?? $selectedVehicleType);
+		$isCheckoutVehicleOverdueBlocked = $isVehicleBlockedByOverdueStatus($pdo, $vehicleId);
+		if ($isCheckoutVehicleOverdueBlocked) {
+			$fallbackQuery = array_merge(
+				[
+					'page' => 'booking-select',
+					'vehicle_type' => $selectedVehicleType,
+					'booking_notice' => $bookingVehicleOverdueMessage,
+				],
+				$bookingSearchQuery
+			);
+			header('Location: index.php?' . http_build_query($fallbackQuery), true, 303);
+			exit;
+		}
+
+		if ($pickupDateTime instanceof DateTimeImmutable && $returnDateTime instanceof DateTimeImmutable) {
+			$hasUserOverlap = $doesUserHaveOverlappingBookingWindow($pdo, $sessionUserId, $pickupDateTime, $returnDateTime);
+			if ($hasUserOverlap) {
+				$engineRedirectQuery = array_merge(
+					[
+						'page' => 'booking-engine',
+						'vehicle_id' => $vehicleId,
+						'vehicle_type' => $selectedVehicleType,
+						'booking_notice' => $bookingActiveOverlapMessage,
+					],
+					$bookingSearchQuery
+				);
+				header('Location: index.php?' . http_build_query($engineRedirectQuery), true, 303);
+				exit;
+			}
+
+			$isCheckoutVehicleAvailable = $isVehicleAvailableForBookingWindow($pdo, $vehicleId, $pickupDateTime, $returnDateTime);
+			if (!$isCheckoutVehicleAvailable) {
+				$fallbackQuery = array_merge(
+					[
+						'page' => 'booking-select',
+						'vehicle_type' => $selectedVehicleType,
+						'booking_notice' => 'Vehicle unavailable for the selected date range.',
+					],
+					$bookingSearchQuery
+				);
+				header('Location: index.php?' . http_build_query($fallbackQuery), true, 303);
+				exit;
+			}
+
+			$bookingPriceBreakdown = $calculateBookingPriceBreakdown(
+				(int) ($checkoutVehicle['price_per_day'] ?? 0),
+				$pickupDateTime,
+				$returnDateTime
+			);
+		}
+	} catch (Throwable $exception) {
+		error_log('Booking checkout lookup failed: ' . $exception->getMessage());
+		$fallbackQuery = array_merge(
+			[
+				'page' => 'booking-select',
+				'vehicle_type' => $selectedVehicleType,
+				'booking_notice' => 'Unable to prepare checkout right now.',
+			],
+			$bookingSearchQuery
+		);
+		header('Location: index.php?' . http_build_query($fallbackQuery), true, 303);
+		exit;
+	}
+
+	$title = 'Ridex | Booking Checkout';
+	$view = 'booking/detail';
+	$viewData = [
+		'checkoutVehicle' => $checkoutVehicle,
+		'selectedVehicleType' => $selectedVehicleType,
+		'bookingSearch' => $bookingSearch,
+		'bookingSearchQuery' => $bookingSearchQuery,
+		'bookingPriceBreakdown' => $bookingPriceBreakdown,
+		'checkoutBookingNumberPreview' => $checkoutBookingNumberPreview,
+		'bookingNotice' => $bookingNotice,
+		'bookingCheckoutPayNowDisabled' => true,
+	];
+} elseif ($page === 'booking-thank-you') {
+	$bookingId = (int) ($_GET['booking_id'] ?? 0);
+	$requestedFlowToken = trim((string) ($_GET['flow_token'] ?? ''));
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isUserSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'user');
+	$bookingFlowLock = isset($_SESSION['booking_flow_lock']) && is_array($_SESSION['booking_flow_lock'])
+		? $_SESSION['booking_flow_lock']
+		: [];
+	$lockedBookingId = (int) ($bookingFlowLock['booking_id'] ?? 0);
+	$lockedFlowToken = trim((string) ($bookingFlowLock['token'] ?? ''));
+
+	if (!$isUserSession || $bookingId <= 0) {
+		header('Location: index.php', true, 302);
+		exit;
+	}
+
+	if ($lockedBookingId > 0 && $lockedBookingId !== $bookingId) {
+		$thankYouRedirectQuery = [
+			'page' => 'booking-thank-you',
+			'booking_id' => $lockedBookingId,
+		];
+		if ($lockedFlowToken !== '') {
+			$thankYouRedirectQuery['flow_token'] = $lockedFlowToken;
+		}
+		header('Location: index.php?' . http_build_query($thankYouRedirectQuery), true, 303);
+		exit;
+	}
+
+	if (
+		$lockedBookingId === $bookingId
+		&& $lockedFlowToken !== ''
+		&& $requestedFlowToken !== ''
+		&& !hash_equals($lockedFlowToken, $requestedFlowToken)
+	) {
+		header(
+			'Location: index.php?page=booking-thank-you&booking_id=' . urlencode((string) $bookingId) . '&flow_token=' . urlencode($lockedFlowToken),
+			true,
+			303
+		);
+		exit;
+	}
+
+	$bookingReceiptRow = null;
+	$bookingReceiptModalData = [];
+	try {
+		$pdo = db();
+		$bookingReceiptRow = $fetchBookingReceiptData($pdo, $bookingId);
+		if (!is_array($bookingReceiptRow)) {
+			header('Location: index.php?page=user-booking-history', true, 302);
+			exit;
+		}
+
+		$sessionUserId = (int) ($sessionUser['id'] ?? 0);
+		$bookingUserId = (int) ($bookingReceiptRow['user_id'] ?? 0);
+		if ($sessionUserId <= 0 || $bookingUserId !== $sessionUserId) {
+			header('Location: index.php?page=user-booking-history', true, 302);
+			exit;
+		}
+
+		if ($lockedFlowToken === '') {
+			if ($requestedFlowToken !== '') {
+				$lockedFlowToken = $requestedFlowToken;
+			} else {
+				try {
+					$lockedFlowToken = bin2hex(random_bytes(12));
+				} catch (Throwable $randomException) {
+					$lockedFlowToken = sha1(uniqid((string) $bookingId, true));
+				}
+			}
+		}
+
+		$_SESSION['booking_flow_lock'] = [
+			'booking_id' => $bookingId,
+			'token' => $lockedFlowToken,
+		];
+
+		$pickupDateTime = $parseDateTimeSafe($bookingReceiptRow['pickup_datetime'] ?? null);
+		$returnDateTime = $parseDateTimeSafe($bookingReceiptRow['return_datetime'] ?? null);
+		$paymentDateTime = $parseDateTimeSafe($bookingReceiptRow['payment_transaction_time'] ?? null);
+		if (!($paymentDateTime instanceof DateTimeImmutable)) {
+			$paymentDateTime = $parseDateTimeSafe($bookingReceiptRow['updated_at'] ?? null);
+		}
+
+		$priceBreakdown = null;
+		if ($pickupDateTime instanceof DateTimeImmutable && $returnDateTime instanceof DateTimeImmutable) {
+			$priceBreakdown = $calculateBookingPriceBreakdown(
+				(int) ($bookingReceiptRow['price_per_day'] ?? 0),
+				$pickupDateTime,
+				$returnDateTime
+			);
+		}
+
+		$paymentStatus = strtolower(trim((string) ($bookingReceiptRow['payment_status'] ?? 'pending')));
+		$bookingNumber = trim((string) ($bookingReceiptRow['booking_number'] ?? ''));
+		if ($bookingNumber === '') {
+			$bookingNumber = '#RX-' . str_pad((string) $bookingId, 4, '0', STR_PAD_LEFT);
+		}
+
+		$statusVariant = $paymentStatus === 'paid' ? 'paid' : 'due';
+		$statusLabel = $paymentStatus === 'paid' ? 'Paid' : 'Due';
+		$statusDateTime = $paymentStatus === 'paid' ? $paymentDateTime : $pickupDateTime;
+		$statusLine = $statusLabel . ' ' . $formatBookingTimeline($statusDateTime);
+
+		$bookingReceiptModalData = [
+			'booking_id' => $bookingId,
+			'booking_number' => $bookingNumber,
+			'status_variant' => $statusVariant,
+			'status_line' => $statusLine,
+			'price_per_day' => (int) (($priceBreakdown['price_per_day'] ?? 0)),
+			'price_for_days' => (int) (($priceBreakdown['price_for_days'] ?? 0)),
+			'drop_charge' => (int) (($priceBreakdown['drop_charge'] ?? 0)),
+			'taxes_and_fees' => (int) (($priceBreakdown['taxes_and_fees'] ?? 0)),
+			'total_amount' => (int) ($bookingReceiptRow['total_amount'] ?? ($priceBreakdown['total_amount'] ?? 0)),
+			'download_pdf_url' => 'index.php?' . http_build_query([
+				'page' => 'booking-receipt-download',
+				'booking_id' => $bookingId,
+			]),
+		];
+	} catch (Throwable $exception) {
+		error_log('Booking thank-you data failed: ' . $exception->getMessage());
+		header('Location: index.php?page=user-booking-history', true, 302);
+		exit;
+	}
+
+	$title = 'Ridex | Booking Confirmed';
+	$view = 'booking/receipt';
+	$viewData = [
+		'bookingReceiptModalData' => $bookingReceiptModalData,
+		'bookingReceiptRow' => $bookingReceiptRow,
+		'bookingFlowHomeUrl' => 'index.php',
+	];
+} elseif ($page === 'booking-receipt-download') {
+	$bookingId = (int) ($_GET['booking_id'] ?? 0);
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isAdminSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'admin');
+	$isUserSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'user');
+
+	if ($bookingId <= 0 || (!$isAdminSession && !$isUserSession)) {
+		header('Location: index.php', true, 302);
+		exit;
+	}
+
+	$receiptRow = null;
+	try {
+		$receiptRow = $fetchBookingReceiptData(db(), $bookingId);
+	} catch (Throwable $exception) {
+		error_log('Receipt download lookup failed: ' . $exception->getMessage());
+	}
+
+	if (!is_array($receiptRow)) {
+		header('Location: index.php?page=user-booking-history', true, 302);
+		exit;
+	}
+
+	if ($isUserSession) {
+		$sessionUserId = (int) ($sessionUser['id'] ?? 0);
+		if ($sessionUserId <= 0 || (int) ($receiptRow['user_id'] ?? 0) !== $sessionUserId) {
+			header('Location: index.php?page=user-booking-history', true, 302);
+			exit;
+		}
+	}
+
+	$pickupDateTime = $parseDateTimeSafe($receiptRow['pickup_datetime'] ?? null);
+	$returnDateTime = $parseDateTimeSafe($receiptRow['return_datetime'] ?? null);
+	$paymentDateTime = $parseDateTimeSafe($receiptRow['payment_transaction_time'] ?? null);
+	if (!($paymentDateTime instanceof DateTimeImmutable)) {
+		$paymentDateTime = $parseDateTimeSafe($receiptRow['updated_at'] ?? null);
+	}
+
+	$priceBreakdown = null;
+	if ($pickupDateTime instanceof DateTimeImmutable && $returnDateTime instanceof DateTimeImmutable) {
+		$priceBreakdown = $calculateBookingPriceBreakdown(
+			(int) ($receiptRow['price_per_day'] ?? 0),
+			$pickupDateTime,
+			$returnDateTime
+		);
+	}
+
+	$bookingNumber = trim((string) ($receiptRow['booking_number'] ?? ''));
+	if ($bookingNumber === '') {
+		$bookingNumber = '#RX-' . str_pad((string) $bookingId, 4, '0', STR_PAD_LEFT);
+	}
+
+	$paymentStatus = strtolower(trim((string) ($receiptRow['payment_status'] ?? 'pending')));
+	$statusLabel = $paymentStatus === 'paid' ? 'Paid' : 'Due';
+	$statusDateTime = $paymentStatus === 'paid' ? $paymentDateTime : $pickupDateTime;
+	$statusLine = $statusLabel . ' ' . $formatBookingTimeline($statusDateTime);
+	$fileSafeBookingNumber = preg_replace('/[^A-Za-z0-9\-]+/', '-', $bookingNumber);
+	$fileSafeBookingNumber = is_string($fileSafeBookingNumber) ? trim($fileSafeBookingNumber, '-') : 'ridex-receipt';
+	if ($fileSafeBookingNumber === '') {
+		$fileSafeBookingNumber = 'ridex-receipt';
+	}
+
+	$pricePerDay = (int) (($priceBreakdown['price_per_day'] ?? 0));
+	$priceForDays = (int) (($priceBreakdown['price_for_days'] ?? 0));
+	$dropCharge = (int) (($priceBreakdown['drop_charge'] ?? 0));
+	$taxesAndFees = (int) (($priceBreakdown['taxes_and_fees'] ?? 0));
+	$totalAmount = (int) ($receiptRow['total_amount'] ?? ($priceBreakdown['total_amount'] ?? 0));
+	$vehicleLabel = trim((string) ($receiptRow['vehicle_full_name'] ?? $receiptRow['vehicle_short_name'] ?? 'Vehicle'));
+	if ($vehicleLabel === '') {
+		$vehicleLabel = 'Vehicle';
+	}
+
+	$pickupLocationLabel = trim((string) ($receiptRow['pickup_location'] ?? 'N/A'));
+	$returnLocationLabel = trim((string) ($receiptRow['return_location'] ?? 'N/A'));
+	$pickupLine = trim($pickupLocationLabel . ' ' . $formatBookingTimeline($pickupDateTime));
+	$returnLine = trim($returnLocationLabel . ' ' . $formatBookingTimeline($returnDateTime));
+
+	$statusColor = $paymentStatus === 'paid'
+		? [0.122, 0.608, 0.224]
+		: [0.804, 0.196, 0.153];
+	$statusBackgroundColor = $paymentStatus === 'paid'
+		? [0.898, 0.965, 0.898]
+		: [0.993, 0.914, 0.902];
+
+	$escapePdfText = static function (string $text): string {
+		return str_replace(
+			['\\', '(', ')'],
+			['\\\\', '\\(', '\\)'],
+			$text
+		);
+	};
+
+	$formatPdfColor = static function (array $rgb): string {
+		$clamp = static function (float $value): float {
+			if ($value < 0) {
+				return 0.0;
+			}
+			if ($value > 1) {
+				return 1.0;
+			}
+
+			return $value;
+		};
+
+		$red = $clamp((float) ($rgb[0] ?? 0));
+		$green = $clamp((float) ($rgb[1] ?? 0));
+		$blue = $clamp((float) ($rgb[2] ?? 0));
+
+		return sprintf('%.3F %.3F %.3F', $red, $green, $blue);
+	};
+
+	$drawFillRect = static function (float $x, float $y, float $width, float $height, array $fillColor) use ($formatPdfColor): string {
+		return 'q ' . $formatPdfColor($fillColor) . ' rg '
+			. sprintf('%.2F %.2F %.2F %.2F', $x, $y, $width, $height)
+			. ' re f Q';
+	};
+
+	$drawText = static function (
+		float $x,
+		float $y,
+		string $fontAlias,
+		int $fontSize,
+		string $text,
+		array $textColor = [0, 0, 0]
+	) use ($escapePdfText, $formatPdfColor): string {
+		return 'BT '
+			. '/' . $fontAlias . ' ' . max(1, $fontSize) . ' Tf '
+			. $formatPdfColor($textColor) . ' rg '
+			. '1 0 0 1 ' . sprintf('%.2F %.2F', $x, $y) . ' Tm '
+			. '(' . $escapePdfText($text) . ') Tj ET';
+	};
+
+	$drawTextRight = static function (
+		float $rightX,
+		float $y,
+		string $fontAlias,
+		int $fontSize,
+		string $text,
+		array $textColor = [0, 0, 0]
+	) use ($drawText): string {
+		$approxWidth = strlen($text) * max(1, $fontSize) * 0.49;
+		$textStartX = max(36.0, $rightX - $approxWidth);
+
+		return $drawText($textStartX, $y, $fontAlias, $fontSize, $text, $textColor);
+	};
+
+	$drawLine = static function (
+		float $startX,
+		float $startY,
+		float $endX,
+		float $endY,
+		array $strokeColor,
+		float $lineWidth = 1.0
+	) use ($formatPdfColor): string {
+		return $formatPdfColor($strokeColor) . ' RG '
+			. sprintf('%.2F', max(0.1, $lineWidth)) . ' w '
+			. sprintf('%.2F %.2F m %.2F %.2F l S', $startX, $startY, $endX, $endY);
+	};
+
+	$pdfCommands = [];
+	$pdfCommands[] = $drawFillRect(0, 0, 595, 842, [0.972, 0.972, 0.972]);
+	$pdfCommands[] = $drawFillRect(24, 24, 547, 794, [1, 1, 1]);
+	$pdfCommands[] = $drawFillRect(24, 724, 547, 94, [0.278, 0.894, 0.216]);
+
+	$pdfCommands[] = $drawText(46, 772, 'F2', 34, 'RIDEX', [1, 1, 1]);
+	$pdfCommands[] = $drawText(46, 748, 'F1', 13, 'Car Rental Service', [1, 1, 1]);
+
+	$generatedLine = 'Generated: ' . (new DateTimeImmutable('now'))->format('M d, Y H:i A');
+	$pdfCommands[] = $drawTextRight(548, 780, 'F2', 14, 'Booking Number: ' . $bookingNumber, [1, 1, 1]);
+	$pdfCommands[] = $drawTextRight(548, 758, 'F1', 11, $generatedLine, [1, 1, 1]);
+
+	$pdfCommands[] = $drawText(46, 690, 'F2', 24, 'Price details', [0.11, 0.11, 0.11]);
+	$pdfCommands[] = $drawLine(46, 680, 548, 680, [0.865, 0.865, 0.865], 1);
+
+	$pdfCommands[] = $drawText(46, 652, 'F1', 13, 'Price per day', [0.18, 0.18, 0.18]);
+	$pdfCommands[] = $drawTextRight(548, 652, 'F1', 13, '$' . number_format((float) $pricePerDay, 2), [0.18, 0.18, 0.18]);
+
+	$pdfCommands[] = $drawText(46, 624, 'F1', 13, 'Price for period', [0.18, 0.18, 0.18]);
+	$pdfCommands[] = $drawTextRight(548, 624, 'F1', 13, '$' . number_format((float) $priceForDays, 2), [0.18, 0.18, 0.18]);
+
+	$pdfCommands[] = $drawText(46, 596, 'F1', 13, 'Drop charge', [0.18, 0.18, 0.18]);
+	$pdfCommands[] = $drawTextRight(548, 596, 'F1', 13, '$' . number_format((float) $dropCharge, 2), [0.18, 0.18, 0.18]);
+
+	$pdfCommands[] = $drawText(46, 568, 'F1', 13, 'Taxes & Fees', [0.18, 0.18, 0.18]);
+	$pdfCommands[] = $drawTextRight(548, 568, 'F1', 13, '$' . number_format((float) $taxesAndFees, 2), [0.18, 0.18, 0.18]);
+
+	$pdfCommands[] = $drawLine(428, 546, 548, 546, [0.55, 0.55, 0.55], 1);
+	$pdfCommands[] = $drawTextRight(548, 522, 'F2', 20, '$' . number_format((float) $totalAmount, 2), [0.07, 0.07, 0.07]);
+
+	$pdfCommands[] = $drawText(46, 472, 'F2', 15, 'Vehicle', [0.45, 0.45, 0.45]);
+	$pdfCommands[] = $drawText(150, 472, 'F1', 13, $vehicleLabel, [0.12, 0.12, 0.12]);
+	$pdfCommands[] = $drawText(46, 446, 'F2', 15, 'Pickup', [0.45, 0.45, 0.45]);
+	$pdfCommands[] = $drawText(150, 446, 'F1', 13, $pickupLine, [0.12, 0.12, 0.12]);
+	$pdfCommands[] = $drawText(46, 420, 'F2', 15, 'Return', [0.45, 0.45, 0.45]);
+	$pdfCommands[] = $drawText(150, 420, 'F1', 13, $returnLine, [0.12, 0.12, 0.12]);
+
+	$pdfCommands[] = $drawFillRect(46, 372, 502, 34, $statusBackgroundColor);
+	$pdfCommands[] = $drawText(60, 384, 'F2', 12, $statusLine, $statusColor);
+
+	$pdfCommands[] = $drawLine(46, 94, 548, 94, [0.88, 0.88, 0.88], 1);
+	$pdfCommands[] = $drawText(46, 76, 'F1', 9, 'RIDEX Car Rental Service', [0.52, 0.52, 0.52]);
+	$pdfCommands[] = $drawText(46, 62, 'F1', 9, 'www.ridex.com | info@ridex.com', [0.52, 0.52, 0.52]);
+
+	$pdfStream = implode("\n", $pdfCommands) . "\n";
+
+	$pdfObjects = [];
+	$pdfObjects[] = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+	$pdfObjects[] = "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
+	$pdfObjects[] = "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>\nendobj\n";
+	$pdfObjects[] = "4 0 obj\n<< /Length " . strlen($pdfStream) . " >>\nstream\n" . $pdfStream . "endstream\nendobj\n";
+	$pdfObjects[] = "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n";
+	$pdfObjects[] = "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n";
+
+	$pdfDocument = "%PDF-1.4\n";
+	$pdfOffsets = [0];
+	foreach ($pdfObjects as $pdfObject) {
+		$pdfOffsets[] = strlen($pdfDocument);
+		$pdfDocument .= $pdfObject;
+	}
+	$xrefOffset = strlen($pdfDocument);
+	$pdfDocument .= 'xref' . "\n";
+	$pdfDocument .= '0 ' . (count($pdfObjects) + 1) . "\n";
+	$pdfDocument .= "0000000000 65535 f \n";
+	for ($xrefIndex = 1; $xrefIndex <= count($pdfObjects); $xrefIndex += 1) {
+		$pdfDocument .= sprintf('%010d 00000 n ', $pdfOffsets[$xrefIndex]) . "\n";
+	}
+	$pdfDocument .= 'trailer' . "\n";
+	$pdfDocument .= '<< /Size ' . (count($pdfObjects) + 1) . ' /Root 1 0 R >>' . "\n";
+	$pdfDocument .= 'startxref' . "\n";
+	$pdfDocument .= $xrefOffset . "\n";
+	$pdfDocument .= "%%EOF";
+
+	header('Content-Type: application/pdf');
+	header('Content-Disposition: attachment; filename="' . $fileSafeBookingNumber . '.pdf"');
+	echo $pdfDocument;
+	exit;
+} elseif ($page === 'vehicles') {
 	$selectedVehicleType = $sanitizeVehicleType($_GET['vehicle_type'] ?? 'cars');
 	$pickupLocation = trim((string) ($_GET['pickup-location'] ?? ''));
 	$returnLocation = trim((string) ($_GET['return-location'] ?? ''));
@@ -2662,6 +4559,243 @@ if ($page === 'vehicles') {
 	$title = 'Ridex | ' . $policy['title'];
 	$view = $policy['view'];
 	$viewData = [];
+} elseif ($page === 'user-booking-history') {
+	$sessionUser = $_SESSION['auth_user'] ?? [];
+	$isUserSession = is_array($sessionUser) && (($sessionUser['role'] ?? '') === 'user');
+	$bookingHistoryNotice = trim((string) ($_GET['booking_notice'] ?? ''));
+
+	$allowedBookingHistoryTabs = ['active', 'pending', 'completed', 'cancelled'];
+	$selectedBookingHistoryTab = strtolower(trim((string) ($_GET['tab'] ?? 'active')));
+	if (!in_array($selectedBookingHistoryTab, $allowedBookingHistoryTabs, true)) {
+		$selectedBookingHistoryTab = 'active';
+	}
+
+	if (!$isUserSession) {
+		$redirectWithUserLoginFlash(
+			'Please log in to view your bookings.',
+			'',
+			false,
+			false,
+			'index.php?' . http_build_query([
+				'page' => 'user-booking-history',
+				'tab' => $selectedBookingHistoryTab,
+			])
+		);
+	}
+
+	$sessionUserId = (int) ($sessionUser['id'] ?? 0);
+	$bookingHistoryRows = [];
+	$bookingHistoryBuckets = [
+		'active' => [],
+		'pending' => [],
+		'completed' => [],
+		'cancelled' => [],
+	];
+	$bookingHistoryEmptyMessages = [
+		'active' => 'You have no active bookings',
+		'pending' => 'You have no pending bookings',
+		'completed' => 'You have no completed bookings',
+		'cancelled' => 'You have no cancelled bookings',
+	];
+
+	$formatBookingCardDate = static function (?DateTimeImmutable $dateTime): string {
+		if (!($dateTime instanceof DateTimeImmutable)) {
+			return 'N/A';
+		}
+
+		return $dateTime->format('D, d M H:i A');
+	};
+
+	$paymentStatusMetaMap = [
+		'paid' => [
+			'label' => 'Paid',
+			'class' => 'paid',
+			'icon' => 'check_circle',
+		],
+		'pending' => [
+			'label' => 'Pending',
+			'class' => 'pending',
+			'icon' => 'hourglass_top',
+		],
+		'cancelled' => [
+			'label' => 'Cancelled',
+			'class' => 'cancelled',
+			'icon' => 'schedule',
+		],
+		'unpaid' => [
+			'label' => 'Unpaid',
+			'class' => 'unpaid',
+			'icon' => 'do_not_disturb_on',
+		],
+		'refunded' => [
+			'label' => 'Refunded',
+			'class' => 'refunded',
+			'icon' => 'sync',
+		],
+	];
+
+	if ($sessionUserId > 0) {
+		try {
+			$nowDateTime = new DateTimeImmutable('now');
+			$bookingHistoryRowsRaw = ridex_booking_fetch_user_history_rows(db(), $sessionUserId, 150);
+
+			foreach ($bookingHistoryRowsRaw as $bookingHistoryRow) {
+				$bookingId = (int) ($bookingHistoryRow['id'] ?? 0);
+				if ($bookingId <= 0) {
+					continue;
+				}
+
+				$bookingStatusRaw = strtolower(trim((string) ($bookingHistoryRow['status'] ?? 'reserved')));
+				$pickupDateTime = $parseDateTimeSafe($bookingHistoryRow['pickup_datetime'] ?? null);
+				$returnDateTime = $parseDateTimeSafe($bookingHistoryRow['return_datetime'] ?? null);
+
+				$effectiveBookingStatus = $bookingStatusRaw;
+				if (!in_array($bookingStatusRaw, ['completed', 'cancelled'], true)) {
+					if ($returnDateTime instanceof DateTimeImmutable && $nowDateTime > $returnDateTime) {
+						$effectiveBookingStatus = 'overdue';
+					} elseif ($bookingStatusRaw === 'reserved' && $pickupDateTime instanceof DateTimeImmutable && $nowDateTime >= $pickupDateTime) {
+						$effectiveBookingStatus = 'on_trip';
+					}
+				}
+
+				$tabKey = 'pending';
+				if ($effectiveBookingStatus === 'cancelled') {
+					$tabKey = 'cancelled';
+				} elseif ($effectiveBookingStatus === 'completed' || trim((string) ($bookingHistoryRow['return_time'] ?? '')) !== '') {
+					$tabKey = 'completed';
+				} elseif (in_array($effectiveBookingStatus, ['on_trip', 'overdue'], true)) {
+					$tabKey = 'active';
+				}
+
+				if ($tabKey === 'active' && !empty($bookingHistoryBuckets['active'])) {
+					continue;
+				}
+
+				$bookingNumber = trim((string) ($bookingHistoryRow['booking_number'] ?? ''));
+				if ($bookingNumber === '') {
+					$bookingNumber = '#RX-' . str_pad((string) $bookingId, 4, '0', STR_PAD_LEFT);
+				}
+
+				$vehicleType = $sanitizeVehicleType($bookingHistoryRow['vehicle_type'] ?? 'cars');
+				$vehicleCategory = ucfirst(rtrim($vehicleType, 's'));
+				if ($vehicleCategory === '') {
+					$vehicleCategory = 'Car';
+				}
+
+				$vehicleName = trim((string) ($bookingHistoryRow['vehicle_full_name'] ?? ''));
+				if ($vehicleName === '') {
+					$vehicleName = trim((string) ($bookingHistoryRow['vehicle_short_name'] ?? 'Vehicle'));
+				}
+				if ($vehicleName === '') {
+					$vehicleName = 'Vehicle';
+				}
+
+				$vehicleImagePath = trim((string) ($bookingHistoryRow['vehicle_image'] ?? ''));
+				if ($vehicleImagePath === '') {
+					$vehicleImagePath = 'images/vehicle-feature.png';
+				}
+
+				$pricePerDay = (int) ($bookingHistoryRow['price_per_day'] ?? 0);
+				$priceBreakdown = null;
+				if ($pickupDateTime instanceof DateTimeImmutable && $returnDateTime instanceof DateTimeImmutable) {
+					$priceBreakdown = $calculateBookingPriceBreakdown($pricePerDay, $pickupDateTime, $returnDateTime);
+				}
+
+				$totalDays = (int) ($priceBreakdown['total_days'] ?? 1);
+				if ($totalDays <= 0) {
+					$totalDays = 1;
+				}
+
+				$priceForDays = (int) ($priceBreakdown['price_for_days'] ?? max(0, $pricePerDay * $totalDays));
+				$dropCharge = (int) ($priceBreakdown['drop_charge'] ?? 20);
+				$totalAmount = (int) ($bookingHistoryRow['total_amount'] ?? ($priceBreakdown['total_amount'] ?? 0));
+				$taxesAndFees = (int) ($priceBreakdown['taxes_and_fees'] ?? max(0, $totalAmount - ($priceForDays + $dropCharge)));
+
+				$paymentStatusRaw = strtolower(trim((string) ($bookingHistoryRow['payment_status'] ?? 'pending')));
+				$paymentMethod = strtolower(trim((string) ($bookingHistoryRow['payment_method'] ?? '')));
+				if (!isset($paymentStatusMetaMap[$paymentStatusRaw])) {
+					if ($paymentMethod === 'khalti') {
+						$paymentStatusRaw = 'paid';
+					} elseif ($paymentMethod === 'pay_on_arrival') {
+						$paymentStatusRaw = 'pending';
+					} else {
+						$paymentStatusRaw = 'unpaid';
+					}
+				}
+
+				$paymentStatusMeta = $paymentStatusMetaMap[$paymentStatusRaw] ?? [
+					'label' => 'Unknown',
+					'class' => 'unknown',
+					'icon' => 'help',
+				];
+
+				$statusDateTime = $parseDateTimeSafe($bookingHistoryRow['payment_transaction_time'] ?? null);
+				if (!($statusDateTime instanceof DateTimeImmutable)) {
+					$statusDateTime = $parseDateTimeSafe($bookingHistoryRow['updated_at'] ?? null);
+				}
+				if (in_array($paymentStatusRaw, ['pending', 'unpaid'], true)) {
+					$statusDateTime = $pickupDateTime;
+				}
+
+				$statusLine = $paymentStatusMeta['label'] . ' ' . $formatBookingTimeline($statusDateTime);
+
+				$bookingHistoryBuckets[$tabKey][] = [
+					'id' => $bookingId,
+					'booking_number' => $bookingNumber,
+					'status_tab' => $tabKey,
+					'payment_status_raw' => $paymentStatusRaw,
+					'payment_status_label' => $paymentStatusMeta['label'],
+					'payment_status_class' => $paymentStatusMeta['class'],
+					'payment_status_icon' => $paymentStatusMeta['icon'],
+					'status_line' => $statusLine,
+					'vehicle_category' => $vehicleCategory,
+					'vehicle_name' => $vehicleName,
+					'vehicle_image' => $vehicleImagePath,
+					'vehicle_seats' => (int) ($bookingHistoryRow['number_of_seats'] ?? 0),
+					'vehicle_transmission' => ucfirst(strtolower(trim((string) ($bookingHistoryRow['transmission_type'] ?? 'N/A')))),
+					'vehicle_age' => (int) ($bookingHistoryRow['driver_age_requirement'] ?? 0),
+					'vehicle_fuel' => ucfirst(strtolower(trim((string) ($bookingHistoryRow['fuel_type'] ?? 'N/A')))),
+					'vehicle_plate' => trim((string) ($bookingHistoryRow['license_plate'] ?? 'N/A')),
+					'pickup_location' => trim((string) ($bookingHistoryRow['pickup_location'] ?? 'N/A')),
+					'return_location' => trim((string) ($bookingHistoryRow['return_location'] ?? 'N/A')),
+					'pickup_datetime_label' => $formatBookingCardDate($pickupDateTime),
+					'return_datetime_label' => $formatBookingCardDate($returnDateTime),
+					'total_days' => $totalDays,
+					'price_per_day' => $pricePerDay,
+					'price_for_days' => $priceForDays,
+					'drop_charge' => $dropCharge,
+					'taxes_and_fees' => $taxesAndFees,
+					'total_amount' => $totalAmount,
+					'download_url' => 'index.php?' . http_build_query([
+						'page' => 'booking-receipt-download',
+						'booking_id' => $bookingId,
+					]),
+					'can_cancel' => $tabKey === 'pending',
+				];
+			}
+		} catch (Throwable $exception) {
+			error_log('User booking history query failed: ' . $exception->getMessage());
+			$bookingHistoryBuckets = [
+				'active' => [],
+				'pending' => [],
+				'completed' => [],
+				'cancelled' => [],
+			];
+		}
+	}
+
+	$bookingHistoryRows = $bookingHistoryBuckets[$selectedBookingHistoryTab] ?? [];
+
+	$title = 'Ridex | My Bookings';
+	$view = 'booking/history';
+	$viewData = [
+		'bookingHistoryRows' => $bookingHistoryRows,
+		'bookingHistoryBuckets' => $bookingHistoryBuckets,
+		'bookingHistorySelectedTab' => $selectedBookingHistoryTab,
+		'bookingHistoryNotice' => $bookingHistoryNotice,
+		'bookingHistoryEmptyMessages' => $bookingHistoryEmptyMessages,
+		'bookingHistoryUserName' => trim((string) ($sessionUser['name'] ?? 'Ridex User')),
+	];
 } elseif ($page === 'admin-manage-fleet') {
 	// manage fleet: admin fleet page with DB-driven type/status filtering.
 	$sessionUser = $_SESSION['auth_user'] ?? [];

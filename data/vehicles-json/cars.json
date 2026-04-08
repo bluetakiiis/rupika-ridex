@@ -1,8 +1,28 @@
 {
     "category": "cars",
-    "synced_at": "2026-04-06T23:03:19+05:45",
+    "synced_at": "2026-04-08T12:11:58+05:45",
     "count": 5,
     "vehicles": [
+        {
+            "id": 5,
+            "category_id": 1,
+            "vehicle_type": "cars",
+            "short_name": "Victoris",
+            "full_name": "Maruti Suzuki Victoris",
+            "price_per_day": 52,
+            "driver_age_requirement": 21,
+            "image_path": "images/car1.png",
+            "number_of_seats": 5,
+            "transmission_type": "automatic",
+            "fuel_type": "electric",
+            "license_plate": "BAA-1234",
+            "status": "available",
+            "gps_id": "GP-5",
+            "last_service_date": "2026-04-05",
+            "description": "Maruti Suzuki Victoris combines comfort, safety, and modern technology for city and highway travel.",
+            "created_at": "2026-04-02 07:19:07",
+            "updated_at": "2026-04-08 12:10:39"
+        },
         {
             "id": 1,
             "category_id": 1,
@@ -62,26 +82,6 @@
             "description": "Honda Elevate is a versatile SUV designed for mixed road conditions with strong comfort and safety features.",
             "created_at": "2026-04-02 07:59:29",
             "updated_at": "2026-04-06 19:55:32"
-        },
-        {
-            "id": 5,
-            "category_id": 1,
-            "vehicle_type": "cars",
-            "short_name": "Victoris",
-            "full_name": "Maruti Suzuki Victoris",
-            "price_per_day": 52,
-            "driver_age_requirement": 21,
-            "image_path": "images/car1.png",
-            "number_of_seats": 5,
-            "transmission_type": "automatic",
-            "fuel_type": "electric",
-            "license_plate": "BAA-1234",
-            "status": "available",
-            "gps_id": "GP-5",
-            "last_service_date": "2026-04-05",
-            "description": "Maruti Suzuki Victoris combines comfort, safety, and modern technology for city and highway travel.",
-            "created_at": "2026-04-02 07:19:07",
-            "updated_at": "2026-04-06 19:17:40"
         },
         {
             "id": 3,
