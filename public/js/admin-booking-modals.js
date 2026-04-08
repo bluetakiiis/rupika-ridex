@@ -337,6 +337,7 @@
 
     if (adminBookingReturnTimeInput instanceof HTMLInputElement) {
       adminBookingReturnTimeInput.required = false;
+      adminBookingReturnTimeInput.setCustomValidity("");
       if (adminBookingReturnTimeInput._flatpickr) {
         adminBookingReturnTimeInput._flatpickr.clear();
       }
@@ -414,6 +415,58 @@
     }
   };
 
+  var validateAdminReturnTimeInput = function (shouldReport) {
+    if (!(adminBookingReturnTimeInput instanceof HTMLInputElement)) {
+      return true;
+    }
+
+    var shouldReportValidity = shouldReport === true;
+    adminBookingReturnTimeInput.setCustomValidity("");
+
+    if (adminBookingReturnTimeInput.required !== true) {
+      return true;
+    }
+
+    var selectedReturnDate = parseDateTimeValue(
+      adminBookingReturnTimeInput.value,
+    );
+    if (!(selectedReturnDate instanceof Date)) {
+      adminBookingReturnTimeInput.setCustomValidity(
+        "Please enter a valid return date/time.",
+      );
+      if (shouldReportValidity) {
+        adminBookingReturnTimeInput.reportValidity();
+      }
+      return false;
+    }
+
+    var nowDate = new Date();
+    if (selectedReturnDate > nowDate) {
+      adminBookingReturnTimeInput.setCustomValidity(
+        "Return time cannot be in the future.",
+      );
+      if (shouldReportValidity) {
+        adminBookingReturnTimeInput.reportValidity();
+      }
+      return false;
+    }
+
+    var pickupDate = bookingReadContext
+      ? parseDateTimeValue(bookingReadContext.pickupDatetime)
+      : null;
+    if (pickupDate instanceof Date && selectedReturnDate < pickupDate) {
+      adminBookingReturnTimeInput.setCustomValidity(
+        "Return time cannot be before pickup time.",
+      );
+      if (shouldReportValidity) {
+        adminBookingReturnTimeInput.reportValidity();
+      }
+      return false;
+    }
+
+    return true;
+  };
+
   var updateBookingLateFeePreview = function () {
     if (
       !(adminBookingLateFeePreview instanceof HTMLElement) ||
@@ -421,6 +474,11 @@
       !bookingReadContext ||
       bookingReadContext.allowLateFeePreview !== true
     ) {
+      return;
+    }
+
+    if (!validateAdminReturnTimeInput(false)) {
+      adminBookingLateFeePreview.hidden = true;
       return;
     }
 
@@ -500,6 +558,7 @@
       altInputClass: "admin-booking-read-modal__input",
       altFormat: "d/m/Y h:i K",
       minuteIncrement: 5,
+      maxDate: "today",
       onReady: function (_selectedDates, _dateStr, instance) {
         if (instance.altInput instanceof HTMLInputElement) {
           instance.altInput.placeholder =
@@ -508,6 +567,7 @@
         }
       },
       onOpen: function (_selectedDates, _dateStr, instance) {
+        instance.set("maxDate", new Date());
         if (instance.calendarContainer instanceof HTMLElement) {
           instance.calendarContainer.classList.add(
             "admin-booking-return-flatpickr",
@@ -515,6 +575,7 @@
         }
       },
       onValueUpdate: function () {
+        validateAdminReturnTimeInput(false);
         updateBookingLateFeePreview();
       },
       prevArrow:
@@ -562,6 +623,8 @@
       triggerButton.getAttribute("data-booking-return-date") || "N/A";
     var returnTimeDisplay =
       triggerButton.getAttribute("data-booking-return-time-display") || "N/A";
+    var pickupDatetime =
+      triggerButton.getAttribute("data-booking-pickup-datetime") || "";
     var scheduledReturnDatetime =
       triggerButton.getAttribute("data-booking-return-datetime") || "";
     var paymentStatusLabel =
@@ -792,8 +855,20 @@
     if (adminBookingReturnTimeInput instanceof HTMLInputElement) {
       adminBookingReturnTimeInput.value = returnTimeInputValue;
       adminBookingReturnTimeInput.required = canCompleteReturn;
+      adminBookingReturnTimeInput.setCustomValidity("");
 
       if (adminBookingReturnTimeInput._flatpickr) {
+        var parsedPickupDate = parseDateTimeValue(pickupDatetime);
+        if (parsedPickupDate instanceof Date) {
+          adminBookingReturnTimeInput._flatpickr.set(
+            "minDate",
+            parsedPickupDate,
+          );
+        } else {
+          adminBookingReturnTimeInput._flatpickr.set("minDate", null);
+        }
+        adminBookingReturnTimeInput._flatpickr.set("maxDate", new Date());
+
         var parsedReturnDate = parseDateTimeValue(returnTimeInputValue);
         if (parsedReturnDate instanceof Date) {
           adminBookingReturnTimeInput._flatpickr.setDate(
@@ -940,6 +1015,7 @@
     }
 
     bookingReadContext = {
+      pickupDatetime: pickupDatetime,
       scheduledReturnDatetime: scheduledReturnDatetime,
       durationPrice: Number.isFinite(durationPrice) ? durationPrice : 0,
       dropCharge: Number.isFinite(dropCharge) ? dropCharge : 0,
@@ -948,6 +1024,7 @@
     };
 
     if (canCompleteReturn) {
+      validateAdminReturnTimeInput(false);
       updateBookingLateFeePreview();
     } else if (adminBookingLateFeePreview instanceof HTMLElement) {
       adminBookingLateFeePreview.textContent = lateFeeNotApplicable
@@ -1172,6 +1249,7 @@
 
   window.RidexBookingModals = {
     initAdminBookingReturnTimePicker: initAdminBookingReturnTimePicker,
+    validateAdminReturnTimeInput: validateAdminReturnTimeInput,
     resetBookingReadModal: resetBookingReadModal,
     updateBookingLateFeePreview: updateBookingLateFeePreview,
     hydrateBookingReadModal: hydrateBookingReadModal,

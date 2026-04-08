@@ -19,6 +19,12 @@ $vehicleTypeRaw = strtolower(trim((string) ($vehicle['vehicle_type'] ?? 'cars'))
 $allowedVehicleTypes = ['cars', 'bikes', 'luxury'];
 $vehicleType = in_array($vehicleTypeRaw, $allowedVehicleTypes, true) ? $vehicleTypeRaw : 'cars';
 $vehicleId = (int) ($vehicle['id'] ?? 0);
+$pickupLocationContext = trim((string) ($pickupLocation ?? ''));
+$returnLocationContext = trim((string) ($returnLocation ?? ''));
+$pickupDateContext = trim((string) ($pickupDate ?? ''));
+$returnDateContext = trim((string) ($returnDate ?? ''));
+$pickupTimeContext = trim((string) ($pickupTime ?? ''));
+$returnTimeContext = trim((string) ($returnTime ?? ''));
 
 $detailQuery = [
 	'page' => 'vehicle-detail',
@@ -44,6 +50,21 @@ $detailUrl = 'index.php?' . http_build_query($detailQuery);
 	<h3 class="vehicle-name"><?= htmlspecialchars($shortName, ENT_QUOTES, 'UTF-8') ?></h3>
 	<div class="vehicle-footer">
 		<div class="vehicle-price">$<?= htmlspecialchars($pricePerDay, ENT_QUOTES, 'UTF-8') ?> <span class="day-text">/ day</span></div>
-		<button class="book-button" type="button">Book Now</button>
+		<button
+			class="book-button"
+			type="button"
+			data-book-now-trigger
+			data-modal-target="user-booking-confirm-modal"
+			data-book-vehicle-id="<?= htmlspecialchars((string) $vehicleId, ENT_QUOTES, 'UTF-8') ?>"
+			data-book-vehicle-type="<?= htmlspecialchars($vehicleType, ENT_QUOTES, 'UTF-8') ?>"
+			data-book-pickup-location="<?= htmlspecialchars($pickupLocationContext, ENT_QUOTES, 'UTF-8') ?>"
+			data-book-return-location="<?= htmlspecialchars($returnLocationContext, ENT_QUOTES, 'UTF-8') ?>"
+			data-book-pickup-date="<?= htmlspecialchars($pickupDateContext, ENT_QUOTES, 'UTF-8') ?>"
+			data-book-return-date="<?= htmlspecialchars($returnDateContext, ENT_QUOTES, 'UTF-8') ?>"
+			data-book-pickup-time="<?= htmlspecialchars($pickupTimeContext, ENT_QUOTES, 'UTF-8') ?>"
+			data-book-return-time="<?= htmlspecialchars($returnTimeContext, ENT_QUOTES, 'UTF-8') ?>"
+		>
+			Book Now
+		</button>
 	</div>
 </article>

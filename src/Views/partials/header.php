@@ -7,6 +7,10 @@ $headerSessionUser = isset($_SESSION['auth_user']) && is_array($_SESSION['auth_u
 	? $_SESSION['auth_user']
 	: [];
 $headerIsAdmin = (($headerSessionUser['role'] ?? '') === 'admin');
+$headerIsUser = (($headerSessionUser['role'] ?? '') === 'user');
+$headerProfileModalTarget = $headerIsAdmin
+	? 'admin-profile-modal'
+	: ($headerIsUser ? 'user-profile-modal' : 'user-login-modal');
 $headerCurrentPage = strtolower(trim((string) ($page ?? '')));
 $headerIsAdminPage = str_starts_with($headerCurrentPage, 'admin');
 ?>
@@ -26,7 +30,7 @@ $headerIsAdminPage = str_starts_with($headerCurrentPage, 'admin');
 				class="icon-button icon-button--profile"
 				type="button"
 				aria-label="User profile"
-				<?= $headerIsAdmin ? 'data-modal-target="admin-profile-modal"' : '' ?>
+				data-modal-target="<?= htmlspecialchars($headerProfileModalTarget, ENT_QUOTES, 'UTF-8') ?>"
 			>
 				<span class="material-symbols-rounded" aria-hidden="true">account_circle</span>
 			</button>

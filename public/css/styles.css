@@ -358,7 +358,7 @@ body.menu-modal-open {
   position: relative;
   z-index: 3;
   width: min(1208px, calc(100% - 1.5in));
-  height: 220px;
+  height: 240px;
   max-width: 1208px;
   background: rgba(217, 217, 217, 0.2);
   border-radius: 32px;
@@ -819,10 +819,14 @@ span.flatpickr-weekday {
 }
 
 .booking-field__help {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 300;
+  line-height: 1.25;
   color: transparent;
-  min-height: 18px;
+  min-height: 32px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .booking-field__help--error {

@@ -9,6 +9,10 @@ $viewData = $viewData ?? [];
 $currentPage = strtolower(trim((string) ($page ?? '')));
 $isAdminPage = str_starts_with($currentPage, 'admin');
 $bodyClass = $isAdminPage ? 'admin-page' : '';
+$layoutSessionUser = isset($_SESSION['auth_user']) && is_array($_SESSION['auth_user'])
+	? $_SESSION['auth_user']
+	: [];
+$isUserAuthenticated = (($layoutSessionUser['role'] ?? '') === 'user');
 ?>
 
 <!DOCTYPE html>
@@ -22,10 +26,15 @@ $bodyClass = $isAdminPage ? 'admin-page' : '';
 		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0"
 	/>
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-	<link rel="stylesheet" href="css/styles.css?v=20260406-2" />
-	<link rel="stylesheet" href="css/admin.css?v=20260406-8" />
+	<link rel="stylesheet" href="css/styles.css?v=20260408-1" />
+	<link rel="stylesheet" href="css/booking.css?v=20260408-1" />
+	<link rel="stylesheet" href="css/admin.css?v=20260408-2" />
+	<link rel="stylesheet" href="css/user.css?v=20260407-8" />
 </head>
-<body class="<?= htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8') ?>">
+<body
+	class="<?= htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8') ?>"
+	data-user-authenticated="<?= $isUserAuthenticated ? '1' : '0' ?>"
+>
 	<?php include __DIR__ . '/../Views/partials/header.php'; ?>
 
 	<main class="page-content" role="main">
@@ -52,6 +61,7 @@ $bodyClass = $isAdminPage ? 'admin-page' : '';
 
 	<?php include __DIR__ . '/../Views/partials/modals.php'; ?>
 
+	<?php $renderFooterMarkup = empty($hideFooter); ?>
 	<?php include __DIR__ . '/../Views/partials/footer.php'; ?>
 </body>
 </html>

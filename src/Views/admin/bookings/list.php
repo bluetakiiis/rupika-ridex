@@ -555,6 +555,7 @@ $formatTotal = static function ($amount): string {
 												data-booking-track-map-url="<?= htmlspecialchars($trackMapUrl, ENT_QUOTES, 'UTF-8') ?>"
 												data-booking-track-has-signal="<?= $hasGpsSignal ? 'true' : 'false' ?>"
 												data-booking-pickup-date="<?= htmlspecialchars($pickupDate, ENT_QUOTES, 'UTF-8') ?>"
+												data-booking-pickup-datetime="<?= htmlspecialchars($booking['pickup_datetime'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
 												data-booking-return-date="<?= htmlspecialchars($returnDate, ENT_QUOTES, 'UTF-8') ?>"
 												data-booking-return-datetime="<?= htmlspecialchars($booking['return_datetime'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
 												data-booking-return-time-display="<?= htmlspecialchars($returnTimeReadOnlyDisplay, ENT_QUOTES, 'UTF-8') ?>"

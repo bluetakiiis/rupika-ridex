@@ -23,9 +23,10 @@ $selectedHomeVehicleTypeLabel = strtolower($homeVehicleTypeLabels[$selectedHomeV
 </section>
 
 <section class="booking-engine" role="search" aria-labelledby="booking-engine-heading" aria-describedby="booking-engine-helper">
-	<form class="booking-engine__form" action="index.php" method="get">
-		<input type="hidden" name="page" value="vehicles" />
+	<form class="booking-engine__form" action="index.php" method="get" data-booking-flow-form="home">
+		<input type="hidden" name="page" value="booking-select" />
 		<input type="hidden" id="vehicle-type-input" name="vehicle_type" value="cars" />
+		<input type="hidden" name="flow_start" value="1" />
 
 		<div class="booking-engine__tabs" role="tablist" aria-label="Vehicle type">
 			<button class="booking-tab is-active" type="button" role="tab" aria-selected="true" tabindex="0" data-vehicle-type="cars">
@@ -45,7 +46,7 @@ $selectedHomeVehicleTypeLabel = strtolower($homeVehicleTypeLabels[$selectedHomeV
 				</div>
 				<div class="booking-input" data-state="default">
 					<span class="booking-input__icon material-symbols-rounded" aria-hidden="true">location_on</span>
-					<input id="pickup-location" name="pickup-location" type="text" placeholder="Pickup Location" aria-invalid="false" />
+					<input id="pickup-location" name="pickup-location" type="text" placeholder="Pickup Location" aria-invalid="false" required />
 				</div>
 				<p class="booking-field__help" id="booking-engine-helper"></p>
 			</div>
@@ -60,9 +61,9 @@ $selectedHomeVehicleTypeLabel = strtolower($homeVehicleTypeLabels[$selectedHomeV
 				</div>
 				<div class="booking-input" data-state="default">
 					<span class="booking-input__icon material-symbols-rounded" aria-hidden="true">location_on</span>
-					<input id="return-location" name="return-location" type="text" placeholder="Return Location" aria-invalid="true" aria-describedby="return-location-help" />
+					<input id="return-location" name="return-location" type="text" placeholder="Return Location" aria-invalid="false" aria-describedby="return-location-help" required />
 				</div>
-				<p class="booking-field__help booking-field__help--error" id="return-location-help"></p>
+				<p class="booking-field__help" id="return-location-help"></p>
 			</div>
 
 			<div class="booking-field">
@@ -73,9 +74,9 @@ $selectedHomeVehicleTypeLabel = strtolower($homeVehicleTypeLabels[$selectedHomeV
 					<button class="booking-input__icon-button" type="button" data-open-picker-for="pickup-date" aria-label="Choose pickup date">
 						<span class="booking-input__icon material-symbols-rounded" aria-hidden="true">calendar_month</span>
 					</button>
-					<input id="pickup-date" name="pickup-date" type="text" placeholder="dd/mm/yyyy" autocomplete="off" aria-invalid="false" />
+					<input id="pickup-date" name="pickup-date" type="text" placeholder="dd/mm/yyyy" autocomplete="off" aria-invalid="false" required />
 					<span class="booking-input__divider" aria-hidden="true"></span>
-					<input id="pickup-time" name="pickup-time" type="text" placeholder="--:-- --" autocomplete="off" aria-label="Pickup time" />
+					<input id="pickup-time" name="pickup-time" type="text" placeholder="--:-- --" autocomplete="off" aria-label="Pickup time" required />
 					<button class="booking-input__icon-button booking-input__icon-button--time" type="button" data-open-picker-for="pickup-time" aria-label="Choose pickup time">
 						<span class="booking-input__time-icon material-symbols-rounded" aria-hidden="true">schedule</span>
 					</button>
@@ -91,18 +92,18 @@ $selectedHomeVehicleTypeLabel = strtolower($homeVehicleTypeLabels[$selectedHomeV
 					<button class="booking-input__icon-button" type="button" data-open-picker-for="return-date" aria-label="Choose return date">
 						<span class="booking-input__icon material-symbols-rounded" aria-hidden="true">calendar_month</span>
 					</button>
-					<input id="return-date" name="return-date" type="text" placeholder="dd/mm/yyyy" autocomplete="off" aria-invalid="true" aria-describedby="return-date-help" />
+					<input id="return-date" name="return-date" type="text" placeholder="dd/mm/yyyy" autocomplete="off" aria-invalid="false" aria-describedby="return-date-help" required />
 					<span class="booking-input__divider" aria-hidden="true"></span>
-					<input id="return-time" name="return-time" type="text" placeholder="--:-- --" autocomplete="off" aria-label="Return time" />
+					<input id="return-time" name="return-time" type="text" placeholder="--:-- --" autocomplete="off" aria-label="Return time" required />
 					<button class="booking-input__icon-button booking-input__icon-button--time" type="button" data-open-picker-for="return-time" aria-label="Choose return time">
 						<span class="booking-input__time-icon material-symbols-rounded" aria-hidden="true">schedule</span>
 					</button>
 				</div>
-				<p class="booking-field__help booking-field__help--error" id="return-date-help"></p>
+				<p class="booking-field__help" id="return-date-help"></p>
 			</div>
 
 			<div class="booking-actions">
-				<button class="booking-search" type="button">Search</button>
+				<button class="booking-search" type="button" data-booking-search-trigger>Search</button>
 			</div>
 		</div>
 	</form>

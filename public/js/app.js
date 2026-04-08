@@ -408,6 +408,9 @@
   const adminCreateImageClearButton = adminCreateVehicleModal?.querySelector(
     "[data-create-image-clear]",
   );
+  const adminCreateLastServiceInput = adminCreateVehicleModal?.querySelector(
+    "[data-create-last-service-input]",
+  );
   const adminEditVehicleForm = adminEditVehicleModal?.querySelector(
     "[data-admin-edit-vehicle-form]",
   );
@@ -826,6 +829,139 @@
     return `${day} ${month}, ${year}`;
   };
 
+  const parseDateOnlyValue = (rawValue) => {
+    const normalized = String(rawValue || "").trim();
+    if (normalized === "") {
+      return null;
+    }
+
+    const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+    if (ymdMatch) {
+      const year = Number.parseInt(ymdMatch[1], 10);
+      const month = Number.parseInt(ymdMatch[2], 10);
+      const day = Number.parseInt(ymdMatch[3], 10);
+      const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+      if (
+        !Number.isNaN(date.getTime()) &&
+        date.getFullYear() === year &&
+        date.getMonth() === month - 1 &&
+        date.getDate() === day
+      ) {
+        return date;
+      }
+      return null;
+    }
+
+    const dmyNumericMatch = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(
+      normalized,
+    );
+    if (dmyNumericMatch) {
+      const day = Number.parseInt(dmyNumericMatch[1], 10);
+      const month = Number.parseInt(dmyNumericMatch[2], 10);
+      const year = Number.parseInt(dmyNumericMatch[3], 10);
+      const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+      if (
+        !Number.isNaN(date.getTime()) &&
+        date.getFullYear() === year &&
+        date.getMonth() === month - 1 &&
+        date.getDate() === day
+      ) {
+        return date;
+      }
+      return null;
+    }
+
+    const dMonYMatch = /^(\d{1,2})\s+([A-Za-z]{3,12}),?\s+(\d{4})$/.exec(
+      normalized,
+    );
+    if (dMonYMatch) {
+      const fallbackDate = new Date(
+        `${dMonYMatch[1]} ${dMonYMatch[2]} ${dMonYMatch[3]}`,
+      );
+      if (!Number.isNaN(fallbackDate.getTime())) {
+        fallbackDate.setHours(0, 0, 0, 0);
+        return fallbackDate;
+      }
+      return null;
+    }
+
+    const fallbackDate = new Date(normalized.replace(" ", "T"));
+    if (Number.isNaN(fallbackDate.getTime())) {
+      return null;
+    }
+
+    fallbackDate.setHours(0, 0, 0, 0);
+    return fallbackDate;
+  };
+
+  const getTodayDateOnly = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  };
+
+  const validateDateNotInFuture = (
+    inputNode,
+    invalidDateMessage,
+    futureDateMessage,
+    shouldReport = true,
+  ) => {
+    if (!(inputNode instanceof HTMLInputElement)) {
+      return true;
+    }
+
+    inputNode.setCustomValidity("");
+    const parsedDate = parseDateOnlyValue(inputNode.value);
+    if (!(parsedDate instanceof Date)) {
+      inputNode.setCustomValidity(invalidDateMessage);
+      if (shouldReport) {
+        inputNode.reportValidity();
+      }
+      return false;
+    }
+
+    if (parsedDate > getTodayDateOnly()) {
+      inputNode.setCustomValidity(futureDateMessage);
+      if (shouldReport) {
+        inputNode.reportValidity();
+      }
+      return false;
+    }
+
+    return true;
+  };
+
+  const validateDateNotBeforeToday = (
+    inputNode,
+    invalidDateMessage,
+    pastDateMessage,
+    shouldReport = true,
+  ) => {
+    if (!(inputNode instanceof HTMLInputElement)) {
+      return true;
+    }
+
+    inputNode.setCustomValidity("");
+    const parsedDate = parseDateOnlyValue(inputNode.value);
+    if (!(parsedDate instanceof Date)) {
+      inputNode.setCustomValidity(invalidDateMessage);
+      if (shouldReport) {
+        inputNode.reportValidity();
+      }
+      return false;
+    }
+
+    if (parsedDate < getTodayDateOnly()) {
+      inputNode.setCustomValidity(pastDateMessage);
+      if (shouldReport) {
+        inputNode.reportValidity();
+      }
+      return false;
+    }
+
+    return true;
+  };
+
   const getBookingModalsApi = () => {
     if (
       !window.RidexBookingModals ||
@@ -871,6 +1007,18 @@
     }
 
     bookingModalsApi.updateBookingLateFeePreview();
+  };
+
+  const validateAdminBookingReturnTime = (shouldReport = false) => {
+    const bookingModalsApi = getBookingModalsApi();
+    if (
+      !bookingModalsApi ||
+      typeof bookingModalsApi.validateAdminReturnTimeInput !== "function"
+    ) {
+      return true;
+    }
+
+    return bookingModalsApi.validateAdminReturnTimeInput(shouldReport);
   };
 
   const hydrateBookingReadModal = (triggerButton) => {
@@ -1349,6 +1497,18 @@
       }
     }
 
+    if (step === 3) {
+      const isLastServiceValid = validateDateNotInFuture(
+        adminCreateLastServiceInput,
+        "Please enter a valid last service date.",
+        "Last service date cannot be in the future.",
+        true,
+      );
+      if (!isLastServiceValid) {
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -1596,6 +1756,18 @@
         !control.checkValidity()
       ) {
         control.reportValidity();
+        return false;
+      }
+    }
+
+    if (step === 3) {
+      const isLastServiceValid = validateDateNotInFuture(
+        adminEditLastServiceInput,
+        "Please enter a valid last service date.",
+        "Last service date cannot be in the future.",
+        true,
+      );
+      if (!isLastServiceValid) {
         return false;
       }
     }
@@ -2417,14 +2589,30 @@
   initAdminBookingReturnTimePicker();
 
   if (adminBookingReturnTimeInput instanceof HTMLInputElement) {
+    const onBookingReturnTimeChanged = () => {
+      validateAdminBookingReturnTime(false);
+      updateBookingLateFeePreview();
+    };
+
     adminBookingReturnTimeInput.addEventListener(
       "input",
-      updateBookingLateFeePreview,
+      onBookingReturnTimeChanged,
     );
     adminBookingReturnTimeInput.addEventListener(
       "change",
-      updateBookingLateFeePreview,
+      onBookingReturnTimeChanged,
     );
+  }
+
+  if (adminBookingCompleteForm instanceof HTMLFormElement) {
+    adminBookingCompleteForm.addEventListener("submit", (event) => {
+      if (validateAdminBookingReturnTime(true)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    });
   }
 
   if (adminBookingTrackAction instanceof HTMLElement) {
@@ -2485,6 +2673,77 @@
       updateEditImageUi();
     });
   }
+
+  if (adminCreateVehicleForm instanceof HTMLFormElement) {
+    adminCreateVehicleForm.addEventListener("submit", (event) => {
+      if (!validateCreateVehicleStep(3)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    });
+  }
+
+  if (adminEditVehicleForm instanceof HTMLFormElement) {
+    adminEditVehicleForm.addEventListener("submit", (event) => {
+      if (!validateEditVehicleStep(3)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    });
+  }
+
+  if (adminMaintenanceFillForm instanceof HTMLFormElement) {
+    adminMaintenanceFillForm.addEventListener("submit", (event) => {
+      const isEstimateValid = validateDateNotBeforeToday(
+        adminMaintenanceFillEstimateInput,
+        "Please enter a valid estimated completion date.",
+        "Estimated completion date cannot be earlier than today.",
+        true,
+      );
+      if (isEstimateValid) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  }
+
+  if (adminMaintenanceEditForm instanceof HTMLFormElement) {
+    adminMaintenanceEditForm.addEventListener("submit", (event) => {
+      const isEstimateValid = validateDateNotBeforeToday(
+        adminMaintenanceEditEstimateInput,
+        "Please enter a valid estimated completion date.",
+        "Estimated completion date cannot be earlier than today.",
+        true,
+      );
+      if (isEstimateValid) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  }
+
+  [
+    adminCreateLastServiceInput,
+    adminEditLastServiceInput,
+    adminMaintenanceFillEstimateInput,
+    adminMaintenanceEditEstimateInput,
+  ].forEach((inputNode) => {
+    if (!(inputNode instanceof HTMLInputElement)) {
+      return;
+    }
+
+    inputNode.addEventListener("input", () => {
+      inputNode.setCustomValidity("");
+    });
+
+    inputNode.addEventListener("change", () => {
+      inputNode.setCustomValidity("");
+    });
+  });
 
   adminCreateStepNextButtons.forEach((button) => {
     button.addEventListener("click", () => {

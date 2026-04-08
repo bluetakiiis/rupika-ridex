@@ -1182,8 +1182,6 @@
   border-color: #30bf2b;
 }
 
-
-
 /* admin dashboard: match Admin Home reference frame */
 .admin-page {
   --admin-header-offset: 80px;
@@ -1380,6 +1378,19 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transform: translateY(0) scale(1);
+  will-change: transform;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.admin-kpi-card:hover,
+.admin-kpi-card:focus-within {
+  transform: translateY(-6px) scale(1.015);
+  border-color: #2ab934;
+  box-shadow: 0 18px 34px rgba(28, 165, 27, 0.2);
 }
 
 .admin-kpi-card__header {
@@ -2739,6 +2750,30 @@
   min-height: 490px;
   border-radius: 12px;
   overflow: hidden;
+  border: 1px solid rgba(76, 177, 80, 0.35);
+  background: #f3f4f5;
+}
+
+.admin-live-tracking__map-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.admin-live-tracking__map-viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.admin-live-tracking__map-stage {
+  position: absolute;
+  width: 170%;
+  height: 170%;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  cursor: grab;
   background:
     radial-gradient(
       circle at 18% 32%,
@@ -2766,6 +2801,99 @@
     );
 }
 
+.admin-live-tracking__map-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mix-blend-mode: multiply;
+  opacity: 0.6;
+}
+
+.admin-live-tracking__map-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 6;
+}
+
+.admin-live-tracking__map-control {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(40, 43, 47, 0.25);
+  background: rgba(255, 255, 255, 0.95);
+  color: #242424;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.12);
+}
+
+.admin-live-tracking__map-control .material-symbols-rounded {
+  font-size: 20px;
+}
+
+.admin-live-tracking__map-control:hover,
+.admin-live-tracking__map-control:focus-visible {
+  border-color: rgba(28, 165, 27, 0.65);
+  color: #1ca51b;
+}
+
+.admin-live-tracking__map-help {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  margin: 0;
+  z-index: 6;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2f3438;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(33, 35, 39, 0.14);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.admin-live-tracking__map-canvas.is-interactive
+  .admin-live-tracking__map-stage {
+  transition: transform 120ms ease-out;
+}
+
+.admin-live-tracking__map-viewport.is-dragging .admin-live-tracking__map-stage {
+  transition: none;
+}
+
+.admin-live-tracking__marker {
+  z-index: 4;
+}
+
+.admin-live-tracking__marker:focus-visible {
+  outline: 2px solid rgba(28, 165, 27, 0.7);
+  outline-offset: 4px;
+}
+
+.admin-live-tracking__map-canvas[data-map-zoom]::after {
+  content: "Zoom " attr(data-map-zoom) "x";
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 6;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1f2428;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(31, 36, 40, 0.15);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
 .admin-live-tracking__map-empty {
   position: absolute;
   top: 50%;
@@ -2775,6 +2903,7 @@
   color: #666666;
   font-size: clamp(20px, 1.3vw, 30px);
   font-weight: 700;
+  z-index: 5;
 }
 
 .admin-live-tracking__marker {
@@ -2839,7 +2968,33 @@
   opacity: 1;
 }
 
+@media (max-width: 900px) {
+  .admin-live-tracking__map-help {
+    font-size: 11px;
+    max-width: calc(100% - 24px);
+    border-radius: 10px;
+  }
 
+  .admin-live-tracking__map-canvas::after {
+    bottom: 42px;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-live-tracking__map-canvas {
+    min-height: 420px;
+  }
+
+  .admin-live-tracking__map-controls {
+    top: 8px;
+    right: 8px;
+  }
+
+  .admin-live-tracking__map-help {
+    left: 8px;
+    bottom: 8px;
+  }
+}
 
 .admin-fleet-card__image {
   width: min(100%, 268px);
@@ -2906,9 +3061,3 @@
   font-size: 16px;
   font-weight: 600;
 }
-
-
-
-
-
-

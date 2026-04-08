@@ -7,10 +7,44 @@ $adminLoginError = isset($adminLoginError) ? trim((string) $adminLoginError) : '
 $adminLoginEmail = isset($adminLoginEmail) ? trim((string) $adminLoginEmail) : '';
 $adminLoginEmailInvalid = isset($adminLoginEmailInvalid) ? (bool) $adminLoginEmailInvalid : false;
 $adminLoginPasswordInvalid = isset($adminLoginPasswordInvalid) ? (bool) $adminLoginPasswordInvalid : false;
+$userLoginError = isset($userLoginError) ? trim((string) $userLoginError) : '';
+$userLoginIdentifier = isset($userLoginIdentifier) ? trim((string) $userLoginIdentifier) : '';
+$userLoginIdentifierInvalid = isset($userLoginIdentifierInvalid) ? (bool) $userLoginIdentifierInvalid : false;
+$userLoginPasswordInvalid = isset($userLoginPasswordInvalid) ? (bool) $userLoginPasswordInvalid : false;
+$userPostAuthRedirect = isset($userPostAuthRedirect) ? trim((string) $userPostAuthRedirect) : 'index.php';
+if ($userPostAuthRedirect === '') {
+	$userPostAuthRedirect = 'index.php';
+}
+$userRegisterErrors = isset($userRegisterErrors) && is_array($userRegisterErrors) ? $userRegisterErrors : [];
+$userRegisterOld = isset($userRegisterOld) && is_array($userRegisterOld) ? $userRegisterOld : [];
+$userRegisterSuccessEmail = isset($userRegisterSuccessEmail) ? trim((string) $userRegisterSuccessEmail) : '';
+$registerPostAuthRedirect = trim((string) ($userRegisterOld['post_auth_redirect'] ?? $userPostAuthRedirect));
+if ($registerPostAuthRedirect === '') {
+	$registerPostAuthRedirect = 'index.php';
+}
 $adminSessionUser = isset($_SESSION['auth_user']) && is_array($_SESSION['auth_user'])
 	? $_SESSION['auth_user']
 	: [];
 $isAdminSession = (($adminSessionUser['role'] ?? '') === 'admin');
+$isUserSession = (($adminSessionUser['role'] ?? '') === 'user');
+$userLoginShouldAutoOpen = $userLoginError !== '';
+$userRegisterShouldAutoOpen = !empty($userRegisterErrors);
+$userRegisterShouldOpenSuccess = $userRegisterSuccessEmail !== '';
+$userRegisterProvinceOptions = ['Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'];
+$userRegisterProvinceSelected = trim((string) ($userRegisterOld['province'] ?? 'Bagmati'));
+if (!in_array($userRegisterProvinceSelected, $userRegisterProvinceOptions, true)) {
+	$userRegisterProvinceSelected = 'Bagmati';
+}
+
+$userRegisterOldBool = static function (array $source, string $key): bool {
+	$rawValue = $source[$key] ?? false;
+	if (is_bool($rawValue)) {
+		return $rawValue;
+	}
+
+	$normalized = strtolower(trim((string) $rawValue));
+	return in_array($normalized, ['1', 'true', 'on', 'yes'], true);
+};
 $adminProfileNameRaw = trim((string) ($adminSessionUser['name'] ?? ''));
 $adminProfileName = trim((string) preg_replace('/\s*admin\s*$/i', '', $adminProfileNameRaw));
 if ($adminProfileName === '') {
@@ -20,6 +54,86 @@ $adminProfileEmail = trim((string) ($adminSessionUser['email'] ?? 'info@ridex.co
 $adminProfilePhone = trim((string) ($adminSessionUser['phone'] ?? ''));
 if ($adminProfilePhone === '') {
 	$adminProfilePhone = '+977 9841222200';
+}
+$userProfileUserId = (int) ($adminSessionUser['id'] ?? 0);
+$userProfileName = trim((string) ($adminSessionUser['name'] ?? ''));
+if ($userProfileName === '') {
+	$userProfileName = 'Ridex User';
+}
+$userProfileEmail = trim((string) ($adminSessionUser['email'] ?? 'user@ridex.com'));
+$userProfilePhone = trim((string) ($adminSessionUser['phone'] ?? ''));
+if ($userProfilePhone === '') {
+	$userProfilePhone = '+977 98XXXXXXXX';
+}
+$userProfileDobRaw = trim((string) ($adminSessionUser['date_of_birth'] ?? ''));
+$userProfileDriversId = trim((string) ($adminSessionUser['drivers_id'] ?? ''));
+
+if ($isUserSession && $userProfileUserId > 0 && function_exists('db')) {
+	try {
+		$userProfileLookupStmt = db()->prepare(
+			'SELECT
+				name,
+				email,
+				phone,
+				drivers_id,
+				date_of_birth
+			 FROM users
+			 WHERE id = :id AND role = :role
+			 LIMIT 1'
+		);
+		$userProfileLookupStmt->execute([
+			'id' => $userProfileUserId,
+			'role' => 'user',
+		]);
+		$userProfileLookup = $userProfileLookupStmt->fetch();
+
+		if (is_array($userProfileLookup)) {
+			$userProfileName = trim((string) ($userProfileLookup['name'] ?? $userProfileName));
+			$userProfileEmail = trim((string) ($userProfileLookup['email'] ?? $userProfileEmail));
+			$userProfilePhoneDb = trim((string) ($userProfileLookup['phone'] ?? ''));
+			if ($userProfilePhoneDb !== '') {
+				$userProfilePhone = $userProfilePhoneDb;
+			}
+			$userProfileDriversIdDb = trim((string) ($userProfileLookup['drivers_id'] ?? ''));
+			if ($userProfileDriversIdDb !== '') {
+				$userProfileDriversId = $userProfileDriversIdDb;
+			}
+			$userProfileDobDb = trim((string) ($userProfileLookup['date_of_birth'] ?? ''));
+			if ($userProfileDobDb !== '') {
+				$userProfileDobRaw = $userProfileDobDb;
+			}
+
+			$_SESSION['auth_user']['name'] = $userProfileName;
+			$_SESSION['auth_user']['email'] = $userProfileEmail;
+			$_SESSION['auth_user']['phone'] = $userProfilePhone;
+			$_SESSION['auth_user']['drivers_id'] = $userProfileDriversId;
+			$_SESSION['auth_user']['date_of_birth'] = $userProfileDobRaw;
+		}
+	} catch (Throwable $exception) {
+		error_log('User profile hydration failed: ' . $exception->getMessage());
+	}
+}
+
+$userProfileDob = 'Not provided';
+if ($userProfileDobRaw !== '') {
+	try {
+		$userProfileDob = (new DateTimeImmutable($userProfileDobRaw))->format('d M Y');
+	} catch (Throwable $exception) {
+		$userProfileDob = $userProfileDobRaw;
+	}
+}
+
+if ($userProfileDriversId === '') {
+	$userProfileDriversId = 'Not provided';
+}
+
+$bookingReceiptModalData = isset($bookingReceiptModalData) && is_array($bookingReceiptModalData)
+	? $bookingReceiptModalData
+	: [];
+$hasBookingReceiptModalData = trim((string) ($bookingReceiptModalData['booking_number'] ?? '')) !== '';
+$bookingReceiptStatusVariant = strtolower(trim((string) ($bookingReceiptModalData['status_variant'] ?? 'due')));
+if (!in_array($bookingReceiptStatusVariant, ['paid', 'due'], true)) {
+	$bookingReceiptStatusVariant = 'due';
 }
 
 //menu: global menu modal (entry point to admin and primary navigation)
@@ -49,7 +163,7 @@ if ($adminProfilePhone === '') {
 			<a class="menu-modal__link" href="index.php?page=vehicles&amp;vehicle_type=cars">Cars</a>
 			<a class="menu-modal__link" href="index.php?page=vehicles&amp;vehicle_type=bikes">Bikes</a>
 			<a class="menu-modal__link" href="index.php?page=vehicles&amp;vehicle_type=luxury">Luxury</a>
-			<button class="menu-modal__link menu-modal__link--static" type="button" aria-disabled="true" disabled>Your Bookings</button>
+			<a class="menu-modal__link menu-modal__link--admin" href="index.php?page=user-booking-history">Your Bookings</a>
 			<button class="menu-modal__link menu-modal__link--admin" type="button" data-modal-target="admin-login-modal">Log in as admin</button>
 		</nav>
 
@@ -58,6 +172,840 @@ if ($adminProfilePhone === '') {
 		</button>
 	</section>
 </div>
+
+<div class="menu-modal user-booking-confirm-modal" id="user-booking-confirm-modal" hidden aria-hidden="true" data-modal-id="user-booking-confirm-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-booking-confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-booking-confirm-title">
+		<header class="menu-modal__header user-booking-confirm-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex booking confirmation">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close booking confirmation" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-booking-confirm-modal__content">
+			<span class="material-symbols-rounded user-booking-confirm-modal__icon" aria-hidden="true">directions_car</span>
+			<p class="user-booking-confirm-modal__text" id="user-booking-confirm-title">Do you want to confirm this booking?</p>
+
+			<div class="user-booking-confirm-modal__actions">
+				<button class="user-booking-confirm-modal__cancel" type="button" data-modal-back>Cancel</button>
+				<form method="get" action="index.php" class="user-booking-confirm-modal__form">
+					<input type="hidden" name="page" value="booking-engine" />
+					<input type="hidden" name="flow_start" value="1" />
+					<input type="hidden" name="vehicle_id" value="0" data-booking-confirm-vehicle-id />
+					<input type="hidden" name="vehicle_type" value="cars" data-booking-confirm-vehicle-type />
+					<input type="hidden" name="pickup-location" value="" data-booking-confirm-pickup-location />
+					<input type="hidden" name="return-location" value="" data-booking-confirm-return-location />
+					<input type="hidden" name="pickup-date" value="" data-booking-confirm-pickup-date />
+					<input type="hidden" name="return-date" value="" data-booking-confirm-return-date />
+					<input type="hidden" name="pickup-time" value="" data-booking-confirm-pickup-time />
+					<input type="hidden" name="return-time" value="" data-booking-confirm-return-time />
+					<button class="user-booking-confirm-modal__confirm" type="submit">Confirm</button>
+				</form>
+			</div>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<?php if ($hasBookingReceiptModalData): ?>
+	<div class="menu-modal user-booking-bill-modal" id="user-booking-bill-modal" hidden aria-hidden="true" data-modal-id="user-booking-bill-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog user-booking-bill-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-booking-bill-title">
+			<header class="menu-modal__header user-booking-bill-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex booking bill">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<button class="menu-modal__close" type="button" aria-label="Close booking bill" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
+			</header>
+
+			<div class="user-booking-bill-modal__content" id="user-booking-bill-title">
+				<p class="user-booking-bill-modal__booking-number">
+					Booking Number:
+					<span><?= htmlspecialchars((string) ($bookingReceiptModalData['booking_number'] ?? '#RX-0000'), ENT_QUOTES, 'UTF-8') ?></span>
+				</p>
+				<p class="user-booking-bill-modal__status user-booking-bill-modal__status--<?= htmlspecialchars($bookingReceiptStatusVariant, ENT_QUOTES, 'UTF-8') ?>">
+					<?= htmlspecialchars((string) ($bookingReceiptModalData['status_line'] ?? 'Due N/A'), ENT_QUOTES, 'UTF-8') ?>
+				</p>
+
+				<h3 class="user-booking-bill-modal__heading">Price details</h3>
+
+				<div class="user-booking-bill-modal__line"><span>Price per day</span><span>$<?= htmlspecialchars(number_format((float) ((int) ($bookingReceiptModalData['price_per_day'] ?? 0)), 2), ENT_QUOTES, 'UTF-8') ?></span></div>
+				<div class="user-booking-bill-modal__line"><span>Price for period</span><span>$<?= htmlspecialchars(number_format((float) ((int) ($bookingReceiptModalData['price_for_days'] ?? 0)), 2), ENT_QUOTES, 'UTF-8') ?></span></div>
+				<div class="user-booking-bill-modal__line"><span>Drop charge</span><span>$<?= htmlspecialchars(number_format((float) ((int) ($bookingReceiptModalData['drop_charge'] ?? 0)), 2), ENT_QUOTES, 'UTF-8') ?></span></div>
+				<div class="user-booking-bill-modal__line"><span>Taxes &amp; Fees</span><span>$<?= htmlspecialchars(number_format((float) ((int) ($bookingReceiptModalData['taxes_and_fees'] ?? 0)), 2), ENT_QUOTES, 'UTF-8') ?></span></div>
+				<div class="user-booking-bill-modal__total"><span>$<?= htmlspecialchars(number_format((float) ((int) ($bookingReceiptModalData['total_amount'] ?? 0)), 2), ENT_QUOTES, 'UTF-8') ?></span></div>
+
+				<div class="user-booking-bill-modal__actions">
+					<a
+						class="user-booking-bill-modal__download"
+						href="<?= htmlspecialchars((string) ($bookingReceiptModalData['download_pdf_url'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>"
+					>
+						Download
+					</a>
+				</div>
+			</div>
+
+			<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+				<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+			</button>
+		</section>
+	</div>
+<?php endif; ?>
+
+<?php if ($userLoginShouldAutoOpen): ?>
+	<button type="button" hidden data-user-auth-auto-open="true" data-modal-target="user-login-modal"></button>
+<?php endif; ?>
+
+<button type="button" hidden data-booking-login-modal-trigger="true" data-modal-target="user-login-modal"></button>
+
+<div class="menu-modal user-login-modal" id="user-login-modal" hidden aria-hidden="true" data-modal-id="user-login-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-auth-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-login-title">
+		<header class="menu-modal__header user-auth-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex user login">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close user login" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-login-modal__content">
+			<h2 class="user-login-modal__title" id="user-login-title">Log In</h2>
+
+			<form class="user-login-form" method="post" action="index.php" autocomplete="off" novalidate>
+				<input type="hidden" name="action" value="user-login" />
+				<input
+					type="hidden"
+					name="post_auth_redirect"
+					value="<?= htmlspecialchars($userPostAuthRedirect, ENT_QUOTES, 'UTF-8') ?>"
+					data-user-post-auth-redirect
+				/>
+
+				<label class="user-login-form__label" for="user-login-identifier-input">Your Email / Driver ID</label>
+				<input
+					class="user-login-form__input<?= $userLoginIdentifierInvalid ? ' user-login-form__input--error' : '' ?>"
+					type="text"
+					id="user-login-identifier-input"
+					name="user_identifier"
+					placeholder="Enter your email or driver's ID"
+					autocomplete="username"
+					spellcheck="false"
+					required
+					value="<?= htmlspecialchars($userLoginIdentifier, ENT_QUOTES, 'UTF-8') ?>"
+				/>
+
+				<label class="user-login-form__label" for="user-login-password-input">Password</label>
+				<div class="user-login-form__password-wrap">
+					<input
+						class="user-login-form__input<?= $userLoginPasswordInvalid ? ' user-login-form__input--error' : '' ?>"
+						type="password"
+						id="user-login-password-input"
+						name="user_password"
+						placeholder="Enter your password"
+						autocomplete="current-password"
+						required
+						minlength="8"
+					/>
+					<button
+						class="user-login-form__password-toggle"
+						type="button"
+						aria-label="Show password"
+						data-password-toggle
+						data-password-target="user-login-password-input"
+					>
+						<span class="material-symbols-rounded" aria-hidden="true">visibility</span>
+					</button>
+				</div>
+
+				<button class="user-login-form__forgot" type="button" data-modal-target="user-forgot-email-modal">Forgot your password?</button>
+
+				<?php if ($userLoginError !== ''): ?>
+					<p class="user-login-form__error" role="alert"><?= htmlspecialchars($userLoginError, ENT_QUOTES, 'UTF-8') ?></p>
+				<?php endif; ?>
+
+				<button class="user-login-form__submit" type="submit">Log In</button>
+			</form>
+
+			<button class="user-login-form__create-account" type="button" data-modal-target="user-register-personal-modal">Create Account</button>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<div class="menu-modal user-login-modal" id="user-forgot-email-modal" hidden aria-hidden="true" data-modal-id="user-forgot-email-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-auth-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-forgot-email-title">
+		<header class="menu-modal__header user-auth-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex forgot password email">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close forgot password" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-reset-modal__content">
+			<h2 class="user-reset-modal__title" id="user-forgot-email-title">Forgot Password?</h2>
+			<p class="user-reset-modal__text">Enter your registered email to continue account verification.</p>
+
+			<label class="user-login-form__label" for="user-forgot-email-input">Email</label>
+			<input
+				class="user-login-form__input"
+				type="email"
+				id="user-forgot-email-input"
+				placeholder="example@ridex.com"
+				autocomplete="email"
+				required
+			/>
+
+			<button
+				class="user-login-form__submit"
+				type="button"
+				data-user-forgot-email-continue
+				data-modal-target="user-forgot-driver-modal"
+			>
+				Continue
+			</button>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<div class="menu-modal user-login-modal" id="user-forgot-driver-modal" hidden aria-hidden="true" data-modal-id="user-forgot-driver-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-auth-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-forgot-driver-title">
+		<header class="menu-modal__header user-auth-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex forgot password driver ID">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close driver ID verification" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-reset-modal__content">
+			<h2 class="user-reset-modal__title" id="user-forgot-driver-title">Driver ID Verification</h2>
+			<p class="user-reset-modal__text">Enter your Driver ID to verify and send a reset email.</p>
+
+			<label class="user-login-form__label" for="user-forgot-driver-id-input">Driver ID</label>
+			<input
+				class="user-login-form__input"
+				type="text"
+				id="user-forgot-driver-id-input"
+				placeholder="Enter your driver ID"
+				autocomplete="off"
+				required
+			/>
+
+			<button
+				class="user-login-form__submit"
+				type="button"
+				data-user-forgot-driver-continue
+				data-modal-target="user-forgot-sent-modal"
+			>
+				Continue
+			</button>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<div class="menu-modal user-login-modal" id="user-forgot-sent-modal" hidden aria-hidden="true" data-modal-id="user-forgot-sent-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-auth-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-forgot-sent-title">
+		<header class="menu-modal__header user-auth-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex reset email sent">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close reset email confirmation" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-reset-modal__content user-reset-modal__content--sent">
+			<span class="material-symbols-rounded user-reset-modal__icon" aria-hidden="true">mail</span>
+			<h2 class="user-reset-modal__title" id="user-forgot-sent-title">Email Sent!</h2>
+			<p class="user-reset-modal__text user-reset-modal__text--center">
+				We sent a password reset link to
+				<span class="user-reset-modal__email" data-user-forgot-email-preview>example@ridex.com</span>.
+				Please check your inbox and spam folder.
+			</p>
+
+			<button class="user-login-form__submit" type="button" data-modal-target="user-login-modal">Resend Email</button>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<form id="user-register-form" method="post" action="index.php" novalidate>
+	<input type="hidden" name="action" value="user-register" />
+	<input
+		type="hidden"
+		name="post_auth_redirect"
+		value="<?= htmlspecialchars($registerPostAuthRedirect, ENT_QUOTES, 'UTF-8') ?>"
+		data-user-post-auth-redirect
+	/>
+	<input
+		type="hidden"
+		name="subscribe_newsletter"
+		value="<?= $userRegisterOldBool($userRegisterOld, 'subscribe_newsletter') ? '1' : '0' ?>"
+		data-user-register-newsletter-hidden
+	/>
+</form>
+
+<?php if ($userRegisterShouldOpenSuccess): ?>
+	<button type="button" hidden data-user-register-auto-open="true" data-modal-target="user-register-created-modal"></button>
+<?php elseif ($userRegisterShouldAutoOpen): ?>
+	<button type="button" hidden data-user-register-auto-open="true" data-modal-target="user-register-personal-modal"></button>
+<?php endif; ?>
+
+<div class="menu-modal user-register-modal" id="user-register-personal-modal" hidden aria-hidden="true" data-modal-id="user-register-personal-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-register-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-register-personal-title">
+		<header class="menu-modal__header user-register-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex create account personal information">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close create account" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-register-modal__content">
+			<h2 class="user-register-modal__title" id="user-register-personal-title">Personal Information</h2>
+
+			<?php if (!empty($userRegisterErrors)): ?>
+				<div class="user-register-modal__errors" role="alert">
+					<?php foreach ($userRegisterErrors as $userRegisterError): ?>
+						<p><?= htmlspecialchars((string) $userRegisterError, ENT_QUOTES, 'UTF-8') ?></p>
+					<?php endforeach; ?>
+				</div>
+			<?php endif; ?>
+
+			<label class="user-register-modal__label" for="user-register-first-name">First Name</label>
+			<input
+				class="admin-create-vehicle-modal__input user-register-modal__input"
+				type="text"
+				id="user-register-first-name"
+				name="first_name"
+				form="user-register-form"
+				maxlength="100"
+				required
+				value="<?= htmlspecialchars((string) ($userRegisterOld['first_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+			/>
+
+			<label class="user-register-modal__label" for="user-register-last-name">Last Name</label>
+			<input
+				class="admin-create-vehicle-modal__input user-register-modal__input"
+				type="text"
+				id="user-register-last-name"
+				name="last_name"
+				form="user-register-form"
+				maxlength="100"
+				required
+				value="<?= htmlspecialchars((string) ($userRegisterOld['last_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+			/>
+
+			<label class="user-register-modal__label" for="user-register-date-of-birth">Date of Birth</label>
+			<div class="admin-create-vehicle-modal__date-wrap user-register-modal__date-wrap">
+				<input
+					class="admin-create-vehicle-modal__input user-register-modal__input"
+					type="text"
+					id="user-register-date-of-birth"
+					name="date_of_birth"
+					form="user-register-form"
+					placeholder="dd/mm/yyyy"
+					autocomplete="off"
+					required
+					value="<?= htmlspecialchars((string) ($userRegisterOld['date_of_birth'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+				/>
+				<button class="booking-input__icon-button admin-create-vehicle-modal__date-button" type="button" aria-label="Open date picker" data-open-picker-for="user-register-date-of-birth">
+					<span class="material-symbols-rounded admin-create-vehicle-modal__date-icon" aria-hidden="true">calendar_month</span>
+				</button>
+			</div>
+
+			<label class="user-register-modal__label" for="user-register-drivers-id">Driver's ID</label>
+			<input
+				class="admin-create-vehicle-modal__input user-register-modal__input"
+				type="text"
+				id="user-register-drivers-id"
+				name="drivers_id"
+				form="user-register-form"
+				maxlength="50"
+				required
+				value="<?= htmlspecialchars((string) ($userRegisterOld['drivers_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+			/>
+
+			<button class="user-register-modal__continue" type="button" data-user-register-next data-user-register-step="personal" data-modal-target="user-register-contact-modal">Continue</button>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<div class="menu-modal user-register-modal" id="user-register-contact-modal" hidden aria-hidden="true" data-modal-id="user-register-contact-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-register-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-register-contact-title">
+		<header class="menu-modal__header user-register-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex create account contact details">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close create account" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-register-modal__content">
+			<h2 class="user-register-modal__title" id="user-register-contact-title">Contact Details</h2>
+
+			<label class="user-register-modal__label" for="user-register-phone">Phone Number</label>
+			<input
+				class="admin-create-vehicle-modal__input user-register-modal__input"
+				type="tel"
+				id="user-register-phone"
+				name="phone"
+				form="user-register-form"
+				maxlength="15"
+				minlength="15"
+				inputmode="numeric"
+				autocomplete="tel"
+				pattern="[+]977 9[0-9]{9}"
+				title="Phone must be in +977 9XXXXXXXXX format."
+				placeholder="+977 9XXXXXXXXX"
+				required
+				value="<?= htmlspecialchars((string) ($userRegisterOld['phone'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+			/>
+
+			<label class="user-register-modal__label" for="user-register-email">Email</label>
+			<input
+				class="admin-create-vehicle-modal__input user-register-modal__input"
+				type="email"
+				id="user-register-email"
+				name="email"
+				form="user-register-form"
+				maxlength="150"
+				required
+				value="<?= htmlspecialchars((string) ($userRegisterOld['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+			/>
+
+			<label class="user-register-modal__checkbox" for="user-register-newsletter">
+				<input
+					type="checkbox"
+					id="user-register-newsletter"
+					data-user-register-newsletter
+					<?= $userRegisterOldBool($userRegisterOld, 'subscribe_newsletter') ? 'checked' : '' ?>
+				/>
+				<span>I confirm to receive news and special offers from Ridex.</span>
+			</label>
+
+			<button class="user-register-modal__continue" type="button" data-user-register-next data-user-register-step="contact" data-modal-target="user-register-address-modal">Continue</button>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<div class="menu-modal user-register-modal" id="user-register-address-modal" hidden aria-hidden="true" data-modal-id="user-register-address-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-register-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-register-address-title">
+		<header class="menu-modal__header user-register-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex create account address details">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close create account" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-register-modal__content">
+			<h2 class="user-register-modal__title" id="user-register-address-title">Address</h2>
+
+			<label class="user-register-modal__label" for="user-register-street">Street</label>
+			<input
+				class="admin-create-vehicle-modal__input user-register-modal__input"
+				type="text"
+				id="user-register-street"
+				name="street"
+				form="user-register-form"
+				maxlength="255"
+				required
+				value="<?= htmlspecialchars((string) ($userRegisterOld['street'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+			/>
+
+			<label class="user-register-modal__label" for="user-register-province">Province</label>
+			<select class="admin-create-vehicle-modal__input admin-create-vehicle-modal__select user-register-modal__input" id="user-register-province" name="province" form="user-register-form" required>
+				<?php foreach ($userRegisterProvinceOptions as $userRegisterProvinceOption): ?>
+					<option value="<?= htmlspecialchars($userRegisterProvinceOption, ENT_QUOTES, 'UTF-8') ?>" <?= $userRegisterProvinceSelected === $userRegisterProvinceOption ? 'selected' : '' ?>><?= htmlspecialchars($userRegisterProvinceOption, ENT_QUOTES, 'UTF-8') ?></option>
+				<?php endforeach; ?>
+			</select>
+
+			<label class="user-register-modal__label" for="user-register-post-code">Post Code</label>
+			<input
+				class="admin-create-vehicle-modal__input user-register-modal__input"
+				type="text"
+				id="user-register-post-code"
+				name="post_code"
+				form="user-register-form"
+				maxlength="20"
+				required
+				value="<?= htmlspecialchars((string) ($userRegisterOld['post_code'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+			/>
+
+			<label class="user-register-modal__label" for="user-register-city">City</label>
+			<input
+				class="admin-create-vehicle-modal__input user-register-modal__input"
+				type="text"
+				id="user-register-city"
+				name="city"
+				form="user-register-form"
+				maxlength="100"
+				required
+				value="<?= htmlspecialchars((string) ($userRegisterOld['city'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+			/>
+
+			<button class="user-register-modal__continue" type="button" data-user-register-next data-user-register-step="address" data-modal-target="user-register-password-modal">Continue</button>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<div class="menu-modal user-register-modal" id="user-register-password-modal" hidden aria-hidden="true" data-modal-id="user-register-password-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-register-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-register-password-title">
+		<header class="menu-modal__header user-register-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex create account password details">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close create account" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-register-modal__content">
+			<h2 class="user-register-modal__title" id="user-register-password-title">Create Password</h2>
+
+			<label class="user-register-modal__label" for="user-register-password-input">Password</label>
+			<div class="admin-login-form__password-wrap user-register-modal__password-wrap">
+				<input
+					class="admin-create-vehicle-modal__input user-register-modal__input"
+					type="password"
+					id="user-register-password-input"
+					name="password"
+					form="user-register-form"
+					required
+					minlength="8"
+					autocomplete="new-password"
+					data-user-register-password
+				/>
+				<button
+					class="admin-login-form__password-toggle"
+					type="button"
+					aria-label="Show password"
+					data-password-toggle
+					data-password-target="user-register-password-input"
+				>
+					<span class="material-symbols-rounded" aria-hidden="true">visibility</span>
+				</button>
+			</div>
+
+			<ul class="user-register-modal__password-rules" aria-label="Password requirements">
+				<li data-password-rule="lowercase"><span class="material-symbols-rounded" aria-hidden="true">check</span><span>One lowercase letter</span></li>
+				<li data-password-rule="uppercase"><span class="material-symbols-rounded" aria-hidden="true">check</span><span>One uppercase letter</span></li>
+				<li data-password-rule="digit"><span class="material-symbols-rounded" aria-hidden="true">check</span><span>One digit</span></li>
+				<li data-password-rule="symbol"><span class="material-symbols-rounded" aria-hidden="true">check</span><span>One symbol</span></li>
+				<li data-password-rule="length"><span class="material-symbols-rounded" aria-hidden="true">check</span><span>8 characters minimum</span></li>
+			</ul>
+
+			<button class="user-register-modal__continue" type="button" data-user-register-next data-user-register-step="password" data-modal-target="user-register-terms-modal">Continue</button>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<div class="menu-modal user-register-modal" id="user-register-terms-modal" hidden aria-hidden="true" data-modal-id="user-register-terms-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-register-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-register-terms-title">
+		<header class="menu-modal__header user-register-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex create account terms and conditions">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close create account" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-register-modal__content user-register-modal__content--terms">
+			<h2 class="user-register-modal__title" id="user-register-terms-title">Terms &amp; Conditions</h2>
+
+			<label class="user-register-modal__checkbox user-register-modal__checkbox--terms" for="user-register-terms-privacy">
+				<input type="checkbox" id="user-register-terms-privacy" name="terms_privacy" value="1" form="user-register-form" required <?= $userRegisterOldBool($userRegisterOld, 'terms_privacy') ? 'checked' : '' ?> />
+				<span><strong>Terms &amp; Privacy:</strong> "I hereby acknowledge that I have thoroughly read, understood, and agree to be legally bound by the <a href="index.php?page=terms-conditions" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>, which also encompasses Ridex's comprehensive <a href="index.php?page=privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> regarding data usage."</span>
+			</label>
+
+			<label class="user-register-modal__checkbox user-register-modal__checkbox--terms" for="user-register-terms-deposit">
+				<input type="checkbox" id="user-register-terms-deposit" name="terms_deposit" value="1" form="user-register-form" required <?= $userRegisterOldBool($userRegisterOld, 'terms_deposit') ? 'checked' : '' ?> />
+				<span><strong>Deposit Policy:</strong> "I confirm that I have reviewed the <a href="index.php?page=deposit-policy" target="_blank" rel="noopener noreferrer">Deposit Policy</a> and consent to the financial hold requirements necessary to proceed with my booking."</span>
+			</label>
+
+			<label class="user-register-modal__checkbox user-register-modal__checkbox--terms" for="user-register-terms-damage">
+				<input type="checkbox" id="user-register-terms-damage" name="terms_damage" value="1" form="user-register-form" required <?= $userRegisterOldBool($userRegisterOld, 'terms_damage') ? 'checked' : '' ?> />
+				<span><strong>Damage Policy:</strong> "I have read and fully accept the terms outlined in Ridex's <a href="index.php?page=damage-management-policy" target="_blank" rel="noopener noreferrer">Damage Management Policy</a>, including my responsibilities regarding vehicle condition and potential repair fees."</span>
+			</label>
+
+			<button class="user-register-modal__continue" type="submit" form="user-register-form" data-user-register-submit>Continue</button>
+			<p class="user-register-modal__terms-note">By continuing, you agree to our Terms of Service and Policies. Your data is protected and never shared with third parties.</p>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<div class="menu-modal user-register-modal" id="user-register-created-modal" hidden aria-hidden="true" data-modal-id="user-register-created-modal">
+	<div class="menu-modal__overlay" data-modal-close></div>
+
+	<section class="menu-modal__dialog admin-modal__dialog user-register-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-register-created-title">
+		<header class="menu-modal__header user-register-modal__header">
+			<div class="menu-modal__brand" aria-label="Ridex account created confirmation">
+				<img
+					src="images/ridex-header.png"
+					alt="Ridex logo"
+					class="menu-modal__logo"
+					onerror="this.onerror=null;this.src='images/logo.svg';"
+				/>
+			</div>
+
+			<button class="menu-modal__close" type="button" aria-label="Close account created modal" data-modal-close>
+				<span class="material-symbols-rounded" aria-hidden="true">close</span>
+			</button>
+		</header>
+
+		<div class="user-register-modal__content user-register-modal__content--created">
+			<h2 class="user-register-modal__title user-register-modal__title--success" id="user-register-created-title">Account Created!</h2>
+
+			<p class="user-register-modal__created-heading">Check your inbox to confirm your email</p>
+			<p class="user-register-modal__created-text">
+				Look for the email we sent to
+				<span class="user-register-modal__created-email"><?= htmlspecialchars($userRegisterSuccessEmail !== '' ? $userRegisterSuccessEmail : 'example@gmail.com', ENT_QUOTES, 'UTF-8') ?></span>
+				and use the button to confirm within the next 24 hours.
+			</p>
+			<p class="user-register-modal__created-text">Can't see it? Check in spam or try again later</p>
+
+			<a class="user-register-modal__continue user-register-modal__continue--link" href="index.php">Go to Home</a>
+		</div>
+
+		<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+			<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+		</button>
+	</section>
+</div>
+
+<?php if ($isUserSession): ?>
+	<div class="menu-modal user-profile-modal" id="user-profile-modal" hidden aria-hidden="true" data-modal-id="user-profile-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog user-auth-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-profile-title">
+			<header class="menu-modal__header user-auth-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex user profile">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<button class="menu-modal__close" type="button" aria-label="Close user profile" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
+			</header>
+
+			<div class="user-profile-modal__content">
+				<h2 class="user-profile-modal__title" id="user-profile-title">Profile</h2>
+
+				<div class="user-profile-modal__identity">
+					<span class="material-symbols-rounded user-profile-modal__avatar" aria-hidden="true">account_circle</span>
+					<p class="user-profile-modal__name"><?= htmlspecialchars($userProfileName, ENT_QUOTES, 'UTF-8') ?></p>
+				</div>
+
+				<dl class="user-profile-modal__details">
+					<div class="user-profile-modal__detail-row">
+						<dt>Email</dt>
+						<dd><?= htmlspecialchars($userProfileEmail, ENT_QUOTES, 'UTF-8') ?></dd>
+					</div>
+					<div class="user-profile-modal__detail-row">
+						<dt>Phone Number</dt>
+						<dd><?= htmlspecialchars($userProfilePhone, ENT_QUOTES, 'UTF-8') ?></dd>
+					</div>
+					<div class="user-profile-modal__detail-row">
+						<dt>Driver ID</dt>
+						<dd><?= htmlspecialchars($userProfileDriversId, ENT_QUOTES, 'UTF-8') ?></dd>
+					</div>
+					<div class="user-profile-modal__detail-row">
+						<dt>Date of Birth</dt>
+						<dd><?= htmlspecialchars($userProfileDob, ENT_QUOTES, 'UTF-8') ?></dd>
+					</div>
+				</dl>
+
+				<div class="user-profile-modal__actions">
+					<button class="user-profile-modal__logout" type="button" data-modal-target="user-logout-modal">Logout</button>
+					<a class="user-profile-modal__history" href="index.php?page=user-booking-history">View Booking History</a>
+				</div>
+			</div>
+
+			<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+				<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+			</button>
+		</section>
+	</div>
+
+	<div class="menu-modal user-logout-modal" id="user-logout-modal" hidden aria-hidden="true" data-modal-id="user-logout-modal">
+		<div class="menu-modal__overlay" data-modal-close></div>
+
+		<section class="menu-modal__dialog admin-modal__dialog user-auth-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-logout-title">
+			<header class="menu-modal__header user-auth-modal__header">
+				<div class="menu-modal__brand" aria-label="Ridex user logout confirmation">
+					<img
+						src="images/ridex-header.png"
+						alt="Ridex logo"
+						class="menu-modal__logo"
+						onerror="this.onerror=null;this.src='images/logo.svg';"
+					/>
+				</div>
+
+				<button class="menu-modal__close" type="button" aria-label="Close user logout prompt" data-modal-close>
+					<span class="material-symbols-rounded" aria-hidden="true">close</span>
+				</button>
+			</header>
+
+			<div class="user-logout-modal__content">
+				<span class="material-symbols-rounded user-logout-modal__icon" aria-hidden="true">delete</span>
+				<p class="user-logout-modal__text" id="user-logout-title">Are you sure you want to logout? This action can’t be undone.</p>
+
+				<div class="user-logout-modal__actions">
+					<button class="user-logout-modal__cancel" type="button" data-modal-back>Cancel</button>
+					<form class="user-logout-modal__form" method="post" action="index.php">
+						<input type="hidden" name="action" value="user-logout" />
+						<button class="user-logout-modal__confirm" type="submit">Logout</button>
+					</form>
+				</div>
+			</div>
+
+			<button class="menu-modal__back admin-modal__back" type="button" aria-label="Back to previous view" data-modal-back>
+				<span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+			</button>
+		</section>
+	</div>
+<?php endif; ?>
 
 <?php if ($isAdminSession): ?>
 	<?php // admin login: admin profile modal for authenticated admins ?>

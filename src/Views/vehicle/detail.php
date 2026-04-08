@@ -82,7 +82,22 @@ if ($vehicle !== null) {
 
 			<div class="vehicle-detail-cta" aria-label="Pricing and booking">
 				<div class="vehicle-price">$<?= htmlspecialchars($pricePerDay, ENT_QUOTES, 'UTF-8') ?> <span class="day-text">/ day</span></div>
-				<button class="book-button" type="button">Book Now</button>
+				<button
+					class="book-button"
+					type="button"
+					data-book-now-trigger
+					data-modal-target="user-booking-confirm-modal"
+					data-book-vehicle-id="<?= htmlspecialchars((string) ((int) ($vehicle['id'] ?? 0)), ENT_QUOTES, 'UTF-8') ?>"
+					data-book-vehicle-type="<?= htmlspecialchars($backVehicleType, ENT_QUOTES, 'UTF-8') ?>"
+					data-book-pickup-location="<?= htmlspecialchars($pickupLocation, ENT_QUOTES, 'UTF-8') ?>"
+					data-book-return-location="<?= htmlspecialchars($returnLocation, ENT_QUOTES, 'UTF-8') ?>"
+					data-book-pickup-date="<?= htmlspecialchars($pickupDate, ENT_QUOTES, 'UTF-8') ?>"
+					data-book-return-date="<?= htmlspecialchars($returnDate, ENT_QUOTES, 'UTF-8') ?>"
+					data-book-pickup-time="<?= htmlspecialchars($pickupTime, ENT_QUOTES, 'UTF-8') ?>"
+					data-book-return-time="<?= htmlspecialchars($returnTime, ENT_QUOTES, 'UTF-8') ?>"
+				>
+					Book Now
+				</button>
 			</div>
 		</div>
 
