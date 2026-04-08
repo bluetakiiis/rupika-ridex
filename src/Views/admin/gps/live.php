@@ -149,27 +149,47 @@ if ($liveTrackingGeneratedAt !== '') {
 					<?php endif; ?>
 				</div>
 
-				<div class="admin-live-tracking__map-canvas">
-					<?php if (!empty($normalizedMarkers)): ?>
-						<?php foreach ($normalizedMarkers as $marker): ?>
-							<button
-								type="button"
-								class="admin-live-tracking__marker<?= $marker['hasGpsSignal'] ? '' : ' is-unavailable' ?>"
-								style="left: <?= htmlspecialchars(number_format((float) $marker['leftPercent'], 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>%; top: <?= htmlspecialchars(number_format((float) $marker['topPercent'], 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>%;"
-								aria-label="<?= htmlspecialchars($marker['bookingNumber'] . ' tracking marker', ENT_QUOTES, 'UTF-8') ?>"
-							>
-								<span class="material-symbols-rounded" aria-hidden="true">location_on</span>
-								<span class="admin-live-tracking__marker-tooltip">
-									<strong><?= htmlspecialchars($marker['bookingNumber'], ENT_QUOTES, 'UTF-8') ?></strong>
-									<span><?= htmlspecialchars($marker['customerName'], ENT_QUOTES, 'UTF-8') ?></span>
-									<span><?= htmlspecialchars($marker['customerPhone'], ENT_QUOTES, 'UTF-8') ?></span>
-									<span><?= htmlspecialchars($marker['location'], ENT_QUOTES, 'UTF-8') ?></span>
-								</span>
-							</button>
-						<?php endforeach; ?>
-					<?php else: ?>
-						<p class="admin-live-tracking__map-empty">Unavailable</p>
-					<?php endif; ?>
+				<div class="admin-live-tracking__map-canvas" data-live-map-root>
+					<div class="admin-live-tracking__map-viewport" data-live-map-viewport aria-label="Interactive tracking map">
+						<div class="admin-live-tracking__map-stage" data-live-map-stage>
+							<span class="admin-live-tracking__map-grid" aria-hidden="true"></span>
+
+							<?php if (!empty($normalizedMarkers)): ?>
+								<?php foreach ($normalizedMarkers as $marker): ?>
+									<button
+										type="button"
+										class="admin-live-tracking__marker<?= $marker['hasGpsSignal'] ? '' : ' is-unavailable' ?>"
+										style="left: <?= htmlspecialchars(number_format((float) $marker['leftPercent'], 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>%; top: <?= htmlspecialchars(number_format((float) $marker['topPercent'], 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>%;"
+										aria-label="<?= htmlspecialchars($marker['bookingNumber'] . ' tracking marker', ENT_QUOTES, 'UTF-8') ?>"
+									>
+										<span class="material-symbols-rounded" aria-hidden="true">location_on</span>
+										<span class="admin-live-tracking__marker-tooltip">
+											<strong><?= htmlspecialchars($marker['bookingNumber'], ENT_QUOTES, 'UTF-8') ?></strong>
+											<span><?= htmlspecialchars($marker['customerName'], ENT_QUOTES, 'UTF-8') ?></span>
+											<span><?= htmlspecialchars($marker['customerPhone'], ENT_QUOTES, 'UTF-8') ?></span>
+											<span><?= htmlspecialchars($marker['location'], ENT_QUOTES, 'UTF-8') ?></span>
+										</span>
+									</button>
+								<?php endforeach; ?>
+							<?php else: ?>
+								<p class="admin-live-tracking__map-empty">Unavailable</p>
+							<?php endif; ?>
+						</div>
+					</div>
+
+					<div class="admin-live-tracking__map-controls" role="group" aria-label="Map controls">
+						<button type="button" class="admin-live-tracking__map-control" data-live-map-zoom-in aria-label="Zoom in">
+							<span class="material-symbols-rounded" aria-hidden="true">add</span>
+						</button>
+						<button type="button" class="admin-live-tracking__map-control" data-live-map-zoom-out aria-label="Zoom out">
+							<span class="material-symbols-rounded" aria-hidden="true">remove</span>
+						</button>
+						<button type="button" class="admin-live-tracking__map-control" data-live-map-reset aria-label="Reset map position">
+							<span class="material-symbols-rounded" aria-hidden="true">my_location</span>
+						</button>
+					</div>
+
+					<p class="admin-live-tracking__map-help">Drag to move map, use mouse wheel or +/- controls to zoom.</p>
 				</div>
 			</section>
 		</div>
